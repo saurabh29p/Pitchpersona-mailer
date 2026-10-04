@@ -327,7 +327,7 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
           <label class="f">Daily cap<input name="rampCap" type="number" step="1"></label>
           <label class="f">Weekend volume (0-1)<input name="weekendFactor" type="number" step="0.05"></label>
         </div>
-        <div class="legend" style="margin-top:12px"><span><i style="background:var(--s1)"></i>Planned emails per sender per day</span><span><i style="background:var(--ref);height:2px"></i>Day 15: cold email can start</span></div>
+        <div class="legend" style="margin-top:12px"><span><i style="background:var(--s1)"></i>Planned emails per sender per day</span><span><i style="background:var(--ref);height:2px"></i><span id="coldDayLab">Day 14: campaigns can start</span></span></div>
         <div class="chart" id="chRamp"></div>
       </div>
       <div class="card"><h2>Behaviour<button type="button" class="qh" data-help="sBehaviour" aria-label="What does this do?" aria-expanded="false">?</button></h2>
@@ -944,7 +944,9 @@ function rampPreview(){
   for(let d=0;d<days;d++){const dt=new Date(start.getTime()+d*864e5),n=planned(d+1,dt,p),h=(B-T)*n/max,x=L+d*bw+1;
     s+=`<rect x="${x}" y="${B-h}" width="${bw-2}" height="${h}" rx="3" fill="var(--s1)"/><rect x="${L+d*bw}" y="${T}" width="${bw}" height="${B-T}" fill="transparent" data-tip="Day ${d+1} (${shortDay(dt.toISOString().slice(0,10))}): ${n} per sender, ${n*Math.max(1,S.inboxes.filter(i=>i.role==='sender').length)} total"/>`;
     if(d%7===0)s+=`<text x="${x}" y="${B+16}">Day ${d+1}</text>`;}
-  s+=`<line x1="${L+14*bw}" x2="${L+14*bw}" y1="${T}" y2="${B}" stroke="var(--ref)" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+  // Campaigns unlock on warm-up day N (Settings, Cold email safety), so the line sits at the start of that day's bar.
+  const N=S.settings.coldMinWarmDays; $('#coldDayLab').textContent=`Day ${N}: campaigns can start`;
+  if(N<=days)s+=`<line x1="${L+(N-1)*bw}" x2="${L+(N-1)*bw}" y1="${T}" y2="${B}" stroke="var(--ref)" stroke-width="1.5" stroke-dasharray="4 3"/>`;
   $('#chRamp').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Planned ramp for the next 28 days">${s}</svg>`;bindTips($('#chRamp'));
 }
 
