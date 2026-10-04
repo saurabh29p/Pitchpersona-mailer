@@ -114,6 +114,23 @@ a{color:var(--accent-text)}
 .sb .prob{color:var(--bad-text);font-size:13px;margin:6px 0 0}
 .opt{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:0 7px;margin-left:6px;vertical-align:2px}
 .rec{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;font-size:13px;margin:6px 0}.rec dt{color:var(--text-2)}.rec dd{margin:0;word-break:break-all}
+/* Help where it's needed: "?" popovers and a "How to use this page" dropdown per tab */
+.qh{width:20px;height:20px;border-radius:50%;border:1px solid var(--line);background:var(--surface-2);color:var(--text-2);font:700 12px/1 "Plus Jakarta Sans",system-ui,sans-serif;cursor:pointer;display:inline-grid;place-items:center;padding:0;flex:none;vertical-align:2px;margin-left:6px}
+.qh:hover,.qh[aria-expanded=true]{border-color:var(--accent);color:var(--accent-text)}
+.pop{position:fixed;z-index:30;width:min(340px,calc(100vw - 32px));background:var(--surface);color:var(--text);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;box-shadow:0 12px 32px rgba(0,0,0,.35);font-size:14px;line-height:1.5}
+.pop h4{margin:0;font-size:14px}.pop p{margin:6px 0 0}.pop ul,.pop ol{margin:6px 0 0;padding-left:18px}.pop li{margin:3px 0}
+.pop .x{border:0;background:none;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
+details.howto{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin:0 0 16px}
+details.howto>summary{cursor:pointer;padding:11px 16px;font-weight:600;list-style:none;display:flex;align-items:center;gap:10px;color:var(--accent-text)}
+details.howto>summary::-webkit-details-marker{display:none}
+details.howto>summary::before{content:"?";display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--grad);color:var(--accent-ink);font-size:12px;font-weight:700;flex:none}
+details.howto>summary::after{content:"\203A";margin-left:auto;color:var(--muted);transition:transform .2s}
+details.howto[open]>summary::after{transform:rotate(90deg)}
+details.howto .in{padding:0 16px 14px;font-size:14px}
+details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howto li{margin:4px 0}
+.btnref{display:grid;grid-template-columns:minmax(0,max-content) minmax(0,1fr);gap:7px 12px;align-items:baseline;font-size:13px;border-top:1px solid var(--line);padding-top:10px}
+.btnref .k{font-weight:600;border:1px solid var(--line);border-radius:8px;padding:2px 8px;background:var(--surface-2);font-size:12px;justify-self:start}
+@media (max-width:640px){.btnref{grid-template-columns:minmax(0,1fr);gap:2px}.btnref .k{margin-top:8px}}
 /* Guide tab visuals */
 .flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:26px}
 .flow>div{position:relative;background:var(--surface-2);border-radius:12px;padding:14px;font-size:14px}
@@ -145,7 +162,7 @@ a{color:var(--accent-text)}
 <header>
   <div class="hrow">
     <h1><span class="brand">P</span>PitchPersona Mailer</h1>
-    <span id="statusPill" class="pill">Loading</span>
+    <span class="row" style="gap:0;flex-wrap:nowrap"><span id="statusPill" class="pill">Loading</span><button type="button" class="qh" data-help="status" aria-label="What do the status and buttons mean?" aria-expanded="false">?</button></span>
     <button class="btn big" id="toggleBtn">Start</button>
     <button class="btn" id="runBtn" title="Runs one cycle now, outside working hours too. Every limit still applies.">Run a cycle now</button>
     <button class="btn sm" id="logoutBtn">Sign out</button>
@@ -167,18 +184,27 @@ a{color:var(--accent-text)}
   <!-- OVERVIEW -->
   <section data-panel="overview">
     <div id="guideBox"></div>
+    <details class="howto" data-howto="overview"><summary>How to use this page</summary><div class="in"><ol><li><b>The banner</b> at the top lists anything that needs you. Green means nothing does.</li>
+<li><b>Tiles</b> show today's warm-up emails, inbox placement over 7 days (keep it at 90% or more), emails rescued from spam, and replies waiting to go out.</li>
+<li><b>Charts</b> show daily volume, and placement against the 90% safe line and the auto-pause line. Hover over a bar or point for the numbers.</li>
+<li><b>Inboxes today</b> shows each inbox's warm-up day, today's sends against its target, and placement.</li>
+<li><b>Domain authentication</b> shows SPF, DKIM and DMARC for each sending domain.</li></ol><div class="btnref"><span class="k">Start warm-up</span><span>Switches the mailer on. If something is missing it stays off and says what.</span><span class="k">Pause all</span><span>Stops all sending at once, campaigns included, even emails already queued in a running cycle.</span><span class="k">Run a cycle now</span><span>Runs one round straight away, even outside working hours. Every limit still applies.</span><span class="k">Re-check DNS</span><span>Reads your DNS again now, instead of waiting for the 6-hour refresh.</span></div></div></details>
     <div class="grid g4" id="tiles"></div>
     <div class="grid g2">
       <div class="card"><h2>Emails per day</h2><div class="legend"><span><i style="background:var(--s1)"></i>New emails</span><span><i style="background:var(--s2)"></i>Replies</span></div><div class="chart" id="chVolume"></div></div>
-      <div class="card"><h2>Inbox placement per day</h2><div class="legend"><span><i style="background:var(--s1);height:3px"></i>% landing in inbox</span><span><i style="background:var(--good);height:2px"></i>90% safe line</span><span><i style="background:var(--bad);height:2px"></i>Auto-pause line</span></div><div class="chart" id="chPlacement"></div></div>
+      <div class="card"><h2>Inbox placement per day<button type="button" class="qh" data-help="placement" aria-label="What does this do?" aria-expanded="false">?</button></h2><div class="legend"><span><i style="background:var(--s1);height:3px"></i>% landing in inbox</span><span><i style="background:var(--good);height:2px"></i>90% safe line</span><span><i style="background:var(--bad);height:2px"></i>Auto-pause line</span></div><div class="chart" id="chPlacement"></div></div>
     </div>
     <div class="card"><div class="row spread"><h2>Inboxes today</h2><button class="btn sm" data-goto="inboxes">Manage inboxes</button></div><div class="scroll"><table id="inboxTable"></table></div></div>
-    <div class="card"><div class="row spread"><h2>Domain authentication</h2><button class="btn sm" id="dnsBtn">Re-check DNS</button></div><p class="muted small">Sending is blocked for a domain until SPF, DKIM and DMARC are all found. That's the most common way a new domain gets burned.</p><div class="grid g2" id="domains"></div></div>
+    <div class="card"><div class="row spread"><h2>Domain authentication<button type="button" class="qh" data-help="dns" aria-label="What does this do?" aria-expanded="false">?</button></h2><button class="btn sm" id="dnsBtn">Re-check DNS</button></div><p class="muted small">Sending is blocked for a domain until SPF, DKIM and DMARC are all found. That's the most common way a new domain gets burned.</p><div class="grid g2" id="domains"></div></div>
   </section>
 
   <!-- INBOXES -->
   <section data-panel="inboxes" class="hidden">
-    <div class="row spread" style="margin-bottom:12px"><p class="muted small" style="margin:0;flex:1;min-width:220px">Senders warm up on the ramp. Seeds are inboxes at other providers (a personal Gmail or Outlook). They only receive and reply, which shows how other providers treat your mail.</p><div class="row"><button class="btn" id="bulkBtn">Add several</button><button class="btn primary" id="addInboxBtn">Add inbox</button></div></div>
+    <details class="howto" data-howto="inboxes"><summary>How to use this page</summary><div class="in"><ol><li>Create an app password for each inbox. The setup checklist on Overview has the steps and links.</li>
+<li>Press <b>Add several</b> and paste one line per inbox: <code>email, app password, name</code>.</li>
+<li>Press <b>Test login</b> on each inbox. Both sending and reading should pass.</li>
+<li>Optional: add one or two seeds at other providers.</li></ol><div class="btnref"><span class="k">Add several</span><span>Adds many inboxes at once, one line each. Each starts on day 1 of its own ramp.</span><span class="k">Add inbox</span><span>Adds one inbox. Under Server settings you can use a provider other than Google.</span><span class="k">Pause / Resume</span><span>Stops sending from this inbox only. It still reads its mail, so replies are caught.</span><span class="k">Test login</span><span>Signs in to send and to read, without sending anything.</span><span class="k">Send one now</span><span>Sends one real warm-up email to another of your inboxes. It counts toward today's limit.</span><span class="k">Edit</span><span>Changes the name, app password, daily cap or day 1. The address can't change.</span><span class="k">Remove</span><span>Deletes the inbox. Its history stays, and leads it was emailing wait in Review.</span></div></div></details>
+    <div class="row spread" style="margin-bottom:12px"><p class="muted small" style="margin:0;flex:1;min-width:220px">Senders warm up on the ramp. Seeds are inboxes at other providers (a personal Gmail or Outlook). They only receive and reply, which shows how other providers treat your mail.</p><div class="row"><button type="button" class="qh" data-help="roles" aria-label="Senders and seeds" aria-expanded="false">?</button><button class="btn" id="bulkBtn">Add several</button><button class="btn primary" id="addInboxBtn">Add inbox</button></div></div>
     <div id="inboxCards" class="grid g2"></div>
   </section>
 
@@ -186,16 +212,26 @@ a{color:var(--accent-text)}
   <!-- CAMPAIGNS -->
   <section data-panel="campaigns" class="hidden">
     <div id="campList">
-      <div class="row spread" style="margin-bottom:12px"><p class="muted small" style="margin:0;flex:1;min-width:220px">Cold email campaigns. An inbox sends campaigns only after its warm-up has earned it (enough warm-up days and healthy placement). Warm-up keeps running alongside.</p><button class="btn primary" id="newCampBtn">New campaign</button></div>
+      <details class="howto" data-howto="campaigns"><summary>How to run a campaign</summary><div class="in"><ol><li>Press <b>New campaign</b>. Start from the PitchPersona sequence or your own template.</li>
+<li>Open it and add leads under <b>Add leads</b>: a CSV, a pasted list, or PitchPersona's Custom webhook.</li>
+<li>Check the emails under <b>Sequence</b> and press <b>Preview with a lead</b>.</li>
+<li>Under <b>Schedule &amp; inboxes</b>, pick the sending inboxes, hours and daily limit.</li>
+<li>Press <b>Send a test</b>, read it in your own inbox, then press <b>Start sending</b>.</li></ol>
+<p class="muted small" style="margin:0 0 10px">The "Which inboxes can send campaigns" box shows which inboxes have earned it. The others keep warming up and join once they qualify.</p><div class="btnref"><span class="k">New campaign</span><span>Creates a draft. Nothing sends until you press Start sending inside it.</span><span class="k">A campaign card</span><span>Opens it: leads, sequence, schedule and results.</span></div></div></details>
+      <div class="row spread" style="margin-bottom:12px"><p class="muted small" style="margin:0;flex:1;min-width:220px">Cold email campaigns. An inbox sends campaigns only after its warm-up has earned it (enough warm-up days and healthy placement). Warm-up keeps running alongside.</p><div class="row"><button type="button" class="qh" data-help="campaigns" aria-label="How campaigns work" aria-expanded="false">?</button><button class="btn primary" id="newCampBtn">New campaign</button></div></div>
       <div class="card" id="coldEligibility"></div>
       <div id="campCards" class="grid g2"></div>
     </div>
     <div id="campView" class="hidden">
       <div class="row spread" style="margin-bottom:12px">
         <div class="row"><button class="btn sm" id="campBack">← Campaigns</button><h2 id="campTitle" style="margin:0"></h2><span id="campStatus" class="pill"></span></div>
-        <div class="row"><button class="btn sm" id="campTestBtn">Send a test</button><button class="btn sm danger" id="campArchive">Archive</button><button class="btn big" id="campToggle">Start</button></div>
+        <div class="row"><button type="button" class="qh" data-help="campButtons" aria-label="What do these buttons do?" aria-expanded="false">?</button><button class="btn sm" id="campTestBtn">Send a test</button><button class="btn sm danger" id="campArchive">Archive</button><button class="btn big" id="campToggle">Start</button></div>
       </div>
       <div class="banner warn hidden" id="campHint" style="margin-bottom:12px"></div>
+      <details class="howto" data-howto="campaign"><summary>How to use this campaign</summary><div class="in"><ul><li><b>Leads</b>: everyone in this campaign. Tap a status to filter, tap a row to see their emails and replies.</li>
+<li><b>Sequence</b>: the emails in order, with the days to wait between them.</li>
+<li><b>Schedule &amp; inboxes</b>: which inboxes send, when, how many a day, plus review and tracking rules.</li>
+<li><b>Add leads</b>: a CSV, a pasted list, or the PitchPersona webhook link.</li></ul><div class="btnref"><span class="k">Start sending / Pause</span><span>Switches this campaign on or off. Leads keep their place.</span><span class="k">Send a test</span><span>Sends step 1, filled in for the newest lead, to one of your own inboxes with [TEST] in the subject.</span><span class="k">Archive</span><span>Ends the campaign. Unsent leads are skipped, and history stays.</span><span class="k">Approve</span><span>Moves leads waiting in Review into the send queue.</span><span class="k">Skip</span><span>Stops the selected leads. They get nothing more.</span><span class="k">Retry</span><span>Puts leads that need a fix, or were skipped, back in the queue.</span><span class="k">Delete unsent</span><span>Removes selected leads that were never emailed.</span></div></div></details>
       <div class="grid g4" id="campTiles"></div>
       <div class="card"><h2>Sent and replies per day</h2><div class="legend"><span><i style="background:var(--s1)"></i>Sent</span><span><i style="background:var(--s2)"></i>Replies</span></div><div class="chart" id="chCamp"></div></div>
       <nav class="subnav" style="padding:0;margin:0 0 12px;max-width:none">
@@ -205,7 +241,7 @@ a{color:var(--accent-text)}
       <div data-subpanel="leads">
         <div class="card">
           <div class="row spread"><div class="row" id="leadChips"></div><input id="leadSearch" class="btn sm" placeholder="Search" style="min-width:160px"></div>
-          <div class="row" style="margin:10px 0"><button class="btn sm primary" data-bulk="approve">Approve selected</button><button class="btn sm" data-bulk="approve-all">Approve all in review</button><button class="btn sm" data-bulk="skip">Skip selected</button><button class="btn sm" data-bulk="requeue">Retry selected</button><button class="btn sm danger" data-bulk="delete">Delete unsent</button></div>
+          <div class="row" style="margin:10px 0"><button class="btn sm primary" data-bulk="approve">Approve selected</button><button class="btn sm" data-bulk="approve-all">Approve all in review</button><button class="btn sm" data-bulk="skip">Skip selected</button><button class="btn sm" data-bulk="requeue">Retry selected</button><button class="btn sm danger" data-bulk="delete">Delete unsent</button><button type="button" class="qh" data-help="leadStatus" aria-label="What do the lead statuses mean?" aria-expanded="false">?</button></div>
           <div class="scroll"><table id="leadTable"></table></div>
           <p class="muted small" id="leadCount"></p>
         </div>
@@ -213,7 +249,7 @@ a{color:var(--accent-text)}
       <div data-subpanel="sequence" class="hidden">
         <div class="card"><p class="muted small" style="margin-top:0">Use variables like <code>{{first_name}}</code> or give a fallback with <code>{{first_name|there}}</code>. A lead with an unfilled variable is held back instead of getting a broken email. Click a variable to insert it.</p><div class="row" id="varChips"></div></div>
         <div id="stepList"></div>
-        <div class="row"><button class="btn" id="addStepBtn">Add step</button><button class="btn primary" id="saveSeqBtn">Save sequence</button><button class="btn" id="previewBtn">Preview with a lead</button></div>
+        <div class="row"><button class="btn" id="addStepBtn">Add step</button><button class="btn primary" id="saveSeqBtn">Save sequence</button><button class="btn" id="previewBtn">Preview with a lead</button><button type="button" class="qh" data-help="sequence" aria-label="How the sequence works" aria-expanded="false">?</button></div>
       </div>
       <div data-subpanel="schedule" class="hidden">
         <form id="schedForm">
@@ -235,7 +271,7 @@ a{color:var(--accent-text)}
         </form>
       </div>
       <div data-subpanel="add" class="hidden">
-        <div class="card"><h2>From PitchPersona (optional)</h2>
+        <div class="card"><h2>From PitchPersona (optional)<button type="button" class="qh" data-help="webhook" aria-label="What does this do?" aria-expanded="false">?</button></h2>
           <p class="small">PitchPersona's <b>Custom webhook</b> export can send prospects and their written sequence straight here, with no change to PitchPersona. In PitchPersona, open Settings and paste this as the webhook URL, then push prospects with <b>Webhook</b>.</p>
           <div class="row"><input id="ingestUrl" readonly class="btn" style="flex:1;min-width:220px;font-family:ui-monospace,monospace;font-size:12px"><button class="btn sm" id="copyIngest">Copy</button><button class="btn sm" id="rotateIngest">New link</button></div>
           <p class="muted small" id="ingestNote"></p>
@@ -253,19 +289,29 @@ a{color:var(--accent-text)}
 
   <!-- REPLIES -->
   <section data-panel="replies" class="hidden">
-    <div class="card"><div class="row spread"><h2>Replies</h2><div class="row"><select id="replyFilter" class="btn sm"><option value="">All</option><option value="reply">Replies</option><option value="auto">Auto-replies</option><option value="unsubscribe">Asked to stop</option><option value="bounce">Bounces</option></select><button class="btn sm" id="markRead">Mark all read</button></div></div>
+    <details class="howto" data-howto="replies"><summary>How to use this page</summary><div class="in"><ol><li>A red number on the Replies tab means new replies.</li>
+<li>Tap a reply to read the whole conversation.</li>
+<li>Answer from your normal inbox (Gmail). The person is already out of every campaign.</li>
+<li>Press <b>Mark all read</b> when you're done.</li></ol><div class="btnref"><span class="k">Filter</span><span>Shows only real replies, auto-replies, people who asked to stop, or bounces.</span><span class="k">Mark all read</span><span>Clears the red number. Nothing is sent or changed.</span></div></div></details>
+    <div class="card"><div class="row spread"><h2>Replies<button type="button" class="qh" data-help="replyKinds" aria-label="What do the reply types mean?" aria-expanded="false">?</button></h2><div class="row"><select id="replyFilter" class="btn sm"><option value="">All</option><option value="reply">Replies</option><option value="auto">Auto-replies</option><option value="unsubscribe">Asked to stop</option><option value="bounce">Bounces</option></select><button class="btn sm" id="markRead">Mark all read</button></div></div>
       <p class="muted small">Every reply stops that lead's sequence and keeps them out of future campaigns. Answer replies from your normal inbox. Tap a row to see the whole conversation.</p><div id="replyList"></div></div>
   </section>
   <!-- ACTIVITY -->
   <section data-panel="activity" class="hidden">
+    <details class="howto" data-howto="activity"><summary>How to use this page</summary><div class="in"><ol><li><b>Recent emails</b> lists every warm-up email. Pick an inbox to see only its mail, and tap one to read it.</li>
+<li>The tag shows where it landed: <span class="pill good">Inbox</span>, <span class="pill bad">Spam, rescued</span>, or not checked yet. Arrival is checked on the next cycle.</li>
+<li><b>Event log</b> records everything the mailer did. Read the errors and warnings.</li></ol><div class="btnref"><span class="k">Clear errors</span><span>Removes errors from the log and resets the error count in the Health score. Nothing else changes.</span></div></div></details>
     <div class="card"><div class="row spread"><h2>Recent emails</h2><select id="mailFilter" class="btn sm"><option value="">All inboxes</option></select></div><p class="muted small">Tap an email to read it. The tag shows where it landed once the receiving inbox was checked.</p><div id="mailList"></div></div>
-    <div class="card"><div class="row spread"><h2>Event log</h2><button class="btn sm" id="clearErrBtn">Clear errors</button></div><div id="events"></div></div>
+    <div class="card"><div class="row spread"><h2>Event log<button type="button" class="qh" data-help="events" aria-label="What does this do?" aria-expanded="false">?</button></h2><button class="btn sm" id="clearErrBtn">Clear errors</button></div><div id="events"></div></div>
   </section>
 
   <!-- SETTINGS -->
   <section data-panel="settings" class="hidden">
+    <details class="howto" data-howto="settings"><summary>How to use this page</summary><div class="in"><ol><li>The defaults are safe for new domains. Most people only set the <b>time zone</b>, <b>working hours</b> and the <b>OpenRouter key</b>.</li>
+<li>Every number has a hard limit, so a typo can't flood a new domain.</li>
+<li>Press <b>Save settings</b> at the bottom. Changes apply from the next cycle.</li></ol><div class="btnref"><span class="k">Write a test email</span><span>Asks the AI for one warm-up email and shows it. Nothing is sent.</span><span class="k">Add</span><span>Adds addresses or whole domains to the do-not-email list.</span><span class="k">Save settings</span><span>Saves this page. The AI key is stored encrypted.</span></div></div></details>
     <form id="settingsForm">
-      <div class="card"><h2>Schedule</h2>
+      <div class="card"><h2>Schedule<button type="button" class="qh" data-help="sSchedule" aria-label="What does this do?" aria-expanded="false">?</button></h2>
         <div class="form">
           <label class="f">Time zone<input name="timezone" required></label>
           <label class="f">Start hour (0-23)<input name="startHour" type="number" step="1"></label>
@@ -273,7 +319,7 @@ a{color:var(--accent-text)}
           <label class="f">Check every (minutes)<input name="tickMinutes" type="number" step="1"></label>
         </div>
       </div>
-      <div class="card"><h2>Ramp</h2>
+      <div class="card"><h2>Ramp<button type="button" class="qh" data-help="sRamp" aria-label="What does this do?" aria-expanded="false">?</button></h2>
         <p class="muted small">Emails each sender sends per day. Every field has a hard maximum the engine enforces, so a typo can't flood a new domain.</p>
         <div class="form">
           <label class="f">Day 1 emails<input name="rampStart" type="number" step="1"></label>
@@ -284,7 +330,7 @@ a{color:var(--accent-text)}
         <div class="legend" style="margin-top:12px"><span><i style="background:var(--s1)"></i>Planned emails per sender per day</span><span><i style="background:var(--ref);height:2px"></i>Day 15: cold email can start</span></div>
         <div class="chart" id="chRamp"></div>
       </div>
-      <div class="card"><h2>Behaviour</h2>
+      <div class="card"><h2>Behaviour<button type="button" class="qh" data-help="sBehaviour" aria-label="What does this do?" aria-expanded="false">?</button></h2>
         <div class="form">
           <label class="f">Reply rate (0-0.6)<input name="replyRate" type="number" step="0.05"></label>
           <label class="f">Star rate (0-0.5)<input name="starRate" type="number" step="0.05"></label>
@@ -294,14 +340,14 @@ a{color:var(--accent-text)}
           <label class="f">Reply delay max (minutes)<input name="replyDelayMax" type="number" step="1"></label>
         </div>
       </div>
-      <div class="card"><h2>Safety</h2>
+      <div class="card"><h2>Safety<button type="button" class="qh" data-help="sSafety" aria-label="What does this do?" aria-expanded="false">?</button></h2>
         <div class="form">
           <label class="f">Halve volume when placement drops below (%)<input name="slowdownBelow" type="number" step="1"></label>
           <label class="f">Pause an inbox when placement drops below (%)<input name="autoPauseBelow" type="number" step="1"></label>
           <label class="toggle full"><input type="checkbox" name="requireDns"><span><b>Block sending until SPF, DKIM and DMARC are set</b><br><span class="muted small">Keep this on. Turning it off lets an unauthenticated domain send, which is how domains get burned.</span></span></label>
         </div>
       </div>
-      <div class="card"><h2>AI writer (OpenRouter)</h2>
+      <div class="card"><h2>AI writer (OpenRouter)<button type="button" class="qh" data-help="sAi" aria-label="What does this do?" aria-expanded="false">?</button></h2>
         <div class="form">
           <label class="toggle full"><input type="checkbox" name="aiEnabled"><span><b>Write emails with AI</b><br><span class="muted small">When this is off or no key is saved, the engine uses built-in templates. They're free, but less varied.</span></span></label>
           <label class="f">OpenRouter API key<input name="openrouterKey" type="password" autocomplete="off" placeholder="sk-or-..."></label>
@@ -311,7 +357,7 @@ a{color:var(--accent-text)}
           <pre id="aiOut" class="full hidden" style="white-space:pre-wrap;background:var(--surface-2);padding:10px;border-radius:8px;margin:0;font-size:13px"></pre>
         </div>
       </div>
-      <div class="card"><h2>Cold email safety</h2>
+      <div class="card"><h2>Cold email safety<button type="button" class="qh" data-help="sCold" aria-label="What does this do?" aria-expanded="false">?</button></h2>
         <div class="form">
           <label class="f">Warm-up days before campaigns<input name="coldMinWarmDays" type="number" step="1"></label>
           <label class="f">Minimum placement for campaigns (%)<input name="coldMinPlacement" type="number" step="1"></label>
@@ -319,7 +365,7 @@ a{color:var(--accent-text)}
           <label class="f full">Send replies to PitchPersona (optional)<input name="replyWebhookUrl" placeholder="https://api.pitchpersona.app/webhooks/instantly/..."><span class="muted small">Paste the Instantly reply address from PitchPersona's settings, and every reply shows up on that prospect's timeline. Leave empty to keep the tools separate.</span></label>
         </div>
       </div>
-      <div class="card"><h2>Do-not-email list</h2>
+      <div class="card"><h2>Do-not-email list<button type="button" class="qh" data-help="sDnc" aria-label="What does this do?" aria-expanded="false">?</button></h2>
         <p class="muted small">Bounces, unsubscribes and anyone who replied are added automatically. Add addresses or whole domains (<code>@competitor.com</code>), separated by spaces or new lines.</p>
         <div class="row"><textarea id="supAdd" rows="2" style="flex:1;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px;color:var(--text)"></textarea><button type="button" class="btn" id="supAddBtn">Add</button></div>
         <div id="supList" class="small" style="margin-top:10px;max-height:260px;overflow:auto"></div>
@@ -563,7 +609,7 @@ function renderInboxCards(){
       <button class="btn sm" data-act="test" data-id="${i.id}">Test login</button>
       ${i.role==='sender'?`<button class="btn sm" data-act="send" data-id="${i.id}">Send one now</button>`:''}
       <button class="btn sm" data-act="edit" data-id="${i.id}">Edit</button>
-      <button class="btn sm danger" data-act="del" data-id="${i.id}">Remove</button>
+      <button class="btn sm danger" data-act="del" data-id="${i.id}">Remove</button><button type="button" class="qh" data-help="inboxActions" aria-label="What do these buttons do?" aria-expanded="false">?</button>
     </div></div>`).join('');
   S.inboxes.filter(i=>i.role==='sender').forEach(i=>rampVsActual($(`[data-ramp="${i.id}"]`),i));
 }
@@ -704,7 +750,7 @@ function guideSteps(){
         <p class="note">Check Overview once a day. If placement drops, the mailer slows down or pauses that inbox by itself.</p>`},
     {id:'campaign',title:'Launch your first campaign',done:S.campaigns.active>0,
       status:S.campaigns.active?`${plural(S.campaigns.active,'campaign')} switched on`:S.campaigns.count?`${plural(S.campaigns.count,'campaign')} drafted, none switched on`:'After warm-up',
-      body:`<ol><li>Open Campaigns and press <b>New campaign</b>. Start from the PitchPersona sequence or write your own.</li><li>Add leads: paste a CSV, or point PitchPersona's Custom webhook at the campaign's ingest address.</li><li>Pick the sending inboxes, preview a few emails, then press <b>Start</b>. Begin at 10 to 15 a day per inbox.</li></ol>
+      body:`<ol><li>Open Campaigns and press <b>New campaign</b>. Start from the PitchPersona sequence or write your own.</li><li>Add leads: paste a CSV, or point PitchPersona's Custom webhook at the campaign's ingest address.</li><li>Pick the sending inboxes, preview a few emails, then press <b>Start sending</b>. Begin at 10 to 15 a day per inbox.</li></ol>
         <p class="note">You can build a campaign now. It waits until an inbox has earned it.</p><div class="acts"><button class="btn sm" data-goto="campaigns">Open Campaigns</button></div>`},
   ];
 }
@@ -760,6 +806,54 @@ document.addEventListener('click',async e=>{
     toast(bad.length?`${bad.length} of ${list.length} failed: ${bad.join(', ')}. The step lists what to check.`:`All ${list.length} logins work.`,bad.length?10000:4000);
     return load(false);}
 });
+
+// ── Help where it's needed: each "?" opens a short explanation next to the control ──
+const HELP={
+  status:{t:'Status and the top buttons',b:()=>`<ul><li><b>Paused</b>: nothing is sent.</li><li><b>Running</b>: sending inside working hours (${S.settings.startHour}:00 to ${S.settings.endHour}:00).</li><li><b>On, but no inbox can send yet</b>: switched on, but every inbox is blocked. The banner says why.</li></ul>
+    <p><b>Start warm-up</b> switches the mailer on, or says what's missing. <b>Pause all</b> stops everything, campaigns included.</p><p><b>Run a cycle now</b> does one round straight away, even outside working hours. Limits still apply.</p>`},
+  placement:{t:'Inbox placement',b:()=>`<p>The share of warm-up emails that landed in the inbox rather than spam, as seen by the inbox that received them.</p><ul><li>90% or more is healthy.</li><li>Below ${S.settings.slowdownBelow}%, that inbox sends half as much.</li><li>Below ${S.settings.autoPauseBelow}%, it pauses itself.</li></ul>`},
+  dns:{t:'Domain authentication',b:`<p>SPF, DKIM and DMARC prove your mail really comes from your domain. Without all three, Gmail and Outlook send it to spam, so sending is blocked until they're found.</p><p>Results are kept for 6 hours. Press <b>Re-check DNS</b> after changing a record.</p><p>DKIM also needs <b>Start authentication</b> clicked in Google Admin.</p>`},
+  roles:{t:'Senders and seeds',b:`<p><b>Sender</b>: an inbox on your sending domains. It warms up on the ramp and can later send campaigns.</p><p><b>Seed</b>: an inbox at another provider, like a personal Gmail or Outlook. It only receives and replies, which shows how outside providers treat your mail.</p><p><b>Add several</b> takes one line per inbox: <code>email, app password, name</code>.</p>`},
+  inboxActions:{t:'Inbox buttons',b:`<ul><li><b>Pause / Resume</b>: stops sending from this inbox only. It still reads mail, so replies are caught.</li><li><b>Test login</b>: signs in to send and to read, without sending anything.</li><li><b>Send one now</b>: sends one real warm-up email to another of your inboxes. It counts toward today's limit.</li><li><b>Edit</b>: change the name, app password, daily cap or day 1.</li><li><b>Remove</b>: deletes the inbox. History stays, and leads it was emailing wait in Review.</li></ul>`},
+  campaigns:{t:'How campaigns work',b:()=>`<ol><li><b>New campaign</b>, then add leads.</li><li>Check the sequence and preview it.</li><li>Pick inboxes and hours.</li><li><b>Send a test</b>, then <b>Start sending</b>.</li></ol><p>An inbox sends campaigns only after ${S.settings.coldMinWarmDays} warm-up days with ${S.settings.coldMinPlacement}% placement or more, and at most ${S.settings.coldDailyCap} campaign emails a day. A reply stops that person's sequence.</p>`},
+  campButtons:{t:'Campaign buttons',b:`<ul><li><b>Start sending / Pause</b>: switches this campaign on or off. Leads keep their place.</li><li><b>Send a test</b>: sends step 1, filled in for the newest lead, to one of your own inboxes with [TEST] in the subject.</li><li><b>Archive</b>: ends the campaign. Unsent leads are skipped and history stays.</li></ul>`},
+  leadStatus:{t:'Lead statuses',b:`<ul><li><b>Review</b>: waiting for you. Approve to queue them.</li><li><b>Scheduled</b>: the next email goes out at its time.</li><li><b>Replied</b>, <b>Bounced</b>, <b>Unsubscribed</b>: stopped for good, and kept out of every campaign.</li><li><b>Finished</b>: got every step.</li><li><b>Needs a fix</b>: a variable was missing, or 5 tries failed. Open it to see why, fix it, then Retry.</li><li><b>Skipped</b>: you stopped it.</li></ul>`},
+  sequence:{t:'Writing the sequence',b:`<p>Step 1 starts the conversation. Each later step waits its delay in days. Tick <b>as a reply in the same thread</b> to send it as "Re:" under the earlier email.</p><p>Variables like <code>{{first_name}}</code> come from the lead. Add a fallback with <code>{{first_name|there}}</code>. A lead missing a variable is held back instead of getting a broken email.</p><p><b>Preview with a lead</b> shows the real email. Nothing is sent.</p>`},
+  webhook:{t:'Leads from PitchPersona',b:`<p>In PitchPersona, open Settings, choose <b>Custom webhook</b>, paste this link and save. Then push prospects with <b>Webhook</b>. Each one arrives here with the emails PitchPersona wrote.</p><p><b>New link</b> stops the old one working, so update PitchPersona after.</p>`},
+  replyKinds:{t:'Reply types',b:`<ul><li><b>Replies</b>: a person wrote back. Their sequence stops, unless the campaign's rules say otherwise. Answer from Gmail.</li><li><b>Auto-replies</b>: out-of-office and similar. The sequence carries on.</li><li><b>Asked to stop</b>: added to the do-not-email list.</li><li><b>Bounces</b>: the address doesn't exist. Added to the do-not-email list.</li></ul>`},
+  events:{t:'Event log',b:`<p>Everything the mailer did, newest first. <b>Errors</b> and <b>warnings</b> are the ones to read. They name the inbox and say what happened.</p><p><b>Clear errors</b> removes errors from the list and resets the error count in each inbox's Health score.</p>`},
+  sSchedule:{t:'Schedule',b:`<p>The mailer sends only between the start and end hour, in this time zone. Pick the time zone most of your recipients are in, for example <code>America/New_York</code> or <code>Asia/Kolkata</code>.</p><p><b>Check every</b> is how often a cycle runs. 10 minutes is a good default.</p>`},
+  sRamp:{t:'Ramp',b:`<p>Warm-up emails per sending inbox per day. Day 1 sends <b>Day 1 emails</b>, then it adds <b>Add per day</b> until the <b>Daily cap</b>. Weekends send that fraction of a weekday.</p><p>The chart below previews the plan. Going slower is always safe. Going faster is how new domains get burned.</p>`},
+  sBehaviour:{t:'Behaviour',b:`<ul><li><b>Reply rate</b>: the share of warm-up emails that get a reply.</li><li><b>Star rate</b>: the share that get starred.</li><li><b>Max replies per thread</b>: how long a back-and-forth can get.</li><li><b>Share sent to seeds</b>: how much goes to your outside inboxes.</li><li><b>Reply delay</b>: replies wait a random time in this range.</li></ul>`},
+  sSafety:{t:'Safety',b:`<p>Placement is checked per inbox over the last few days. Below the first number its volume halves. Below the second, it pauses itself.</p><p>Keep <b>Block sending until SPF, DKIM and DMARC are set</b> on.</p>`},
+  sAi:{t:'AI writer',b:`<p>Writes each warm-up email with an AI model through OpenRouter, so no two look alike. Links and em dashes are removed from what it writes.</p><p>Get a key at openrouter.ai/keys. <b>Write a test email</b> shows one without sending it. With no key, built-in templates are used.</p>`},
+  sCold:{t:'Cold email safety',b:`<p>An inbox can send campaigns only after this many warm-up days, and only while its 7-day placement is at or above the minimum.</p><p><b>Campaign emails per inbox per day</b> is the total across all campaigns.</p><p>The PitchPersona reply address is optional. With it, replies show up on that prospect in PitchPersona.</p>`},
+  sDnc:{t:'Do-not-email list',b:`<p>Nobody on this list gets a campaign email. Bounces, unsubscribes, "remove me" replies and anyone who replied are added automatically.</p><p>Add <code>@company.com</code> to block a whole company.</p>`},
+};
+const pop=document.createElement('div'); pop.className='pop hidden'; pop.setAttribute('role','dialog'); document.body.appendChild(pop);
+let popFor=null, popY=0;
+function closePop(){if(!popFor)return;pop.classList.add('hidden');popFor.setAttribute('aria-expanded','false');popFor=null;}
+document.addEventListener('click',e=>{
+  const q=e.target.closest('.qh');
+  if(!q){if(popFor&&(!e.target.closest('.pop')||e.target.closest('.pop .x')))closePop();return;}
+  e.preventDefault(); e.stopPropagation();
+  if(popFor===q)return closePop();
+  closePop();
+  const h=HELP[q.dataset.help]; if(!h)return;
+  pop.innerHTML=`<div class="row spread" style="flex-wrap:nowrap;align-items:flex-start"><h4>${h.t}</h4><button type="button" class="x" aria-label="Close">×</button></div>${typeof h.b==='function'?h.b():h.b}`;
+  pop.setAttribute('aria-label',h.t); pop.classList.remove('hidden'); popFor=q; popY=scrollY; q.setAttribute('aria-expanded','true');
+  const r=q.getBoundingClientRect(), w=pop.offsetWidth, ht=pop.offsetHeight;
+  let top=r.bottom+8; if(top+ht>innerHeight-8&&r.top-ht-8>=8)top=r.top-ht-8;
+  pop.style.left=Math.max(16,Math.min(r.left+r.width/2-w/2,innerWidth-w-16))+'px';
+  pop.style.top=Math.max(8,Math.min(top,innerHeight-ht-8))+'px';
+},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closePop();});
+// The popover is pinned to the screen, so it closes once the page scrolls away from it (a small nudge doesn't count).
+addEventListener('scroll',()=>{if(Math.abs(scrollY-popY)>40)closePop();},{passive:true}); addEventListener('resize',closePop);
+// Each page's "How to use this page" stays open or closed the way you left it.
+$$('details.howto').forEach(d=>{const k='ww-howto-'+d.dataset.howto;
+  try{if(localStorage.getItem(k)==='1')d.open=true;}catch{}
+  d.addEventListener('toggle',()=>{try{localStorage.setItem(k,d.open?'1':'0');}catch{}});});
 
 // Activity
 function renderEvents(){
