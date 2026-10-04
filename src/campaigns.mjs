@@ -186,8 +186,11 @@ export function createCampaigns(ctx) {
 
   // ── Sending ───────────────────────────────────────────────────────────────────
   const URL_RE = /https?:\/\/[^\s<>()"']+[^\s<>()"'.,;:!?]/g;
+  // Links inside campaign emails use the link address when one is set, so a cold email never
+  // carries the panel's own address (which may be on your main domain).
+  const linkBase = (s) => s.linkUrl || s.publicUrl;
   function trackedBodies(campaign, text, msgToken, s) {
-    const base = s.publicUrl;
+    const base = linkBase(s);
     let plain = text;
     if (campaign.track_clicks && base) plain = plain.replace(URL_RE, (u) => `${base}/c/${msgToken}?u=${encodeURIComponent(u)}`);
     if (!(campaign.track_opens && base)) return { text: plain };
@@ -220,7 +223,7 @@ export function createCampaigns(ctx) {
     const messageId = `<${crypto.randomUUID()}@${domainOf(sender.email)}>`;
     const bodies = trackedBodies(campaign, mail.text, msgToken, s);
     const headers = {};
-    if (s.publicUrl) { headers["List-Unsubscribe"] = `<${s.publicUrl}/u/${lead.token}>, <mailto:${sender.email}?subject=unsubscribe>`; headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"; }
+    if (linkBase(s)) { headers["List-Unsubscribe"] = `<${linkBase(s)}/u/${lead.token}>, <mailto:${sender.email}?subject=unsubscribe>`; headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"; }
     else headers["List-Unsubscribe"] = `<mailto:${sender.email}?subject=unsubscribe>`;
     const threadRefs = mail.threaded && lead.last_message_id ? { inReplyTo: lead.last_message_id, references: [lead.thread_id, lead.last_message_id].filter((v, i, a) => v && a.indexOf(v) === i) } : {};
     await smtpSend(sender, { to: { name: lead.name || "", address: lead.email }, subject: mail.subject, messageId, headers, ...bodies, ...threadRefs });

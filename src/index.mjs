@@ -87,7 +87,8 @@ const SETTINGS = {
   coldMinWarmDays:   { def: 14,   min: 7,   max: 60 },    // an inbox sends cold email only after this many warm-up days
   coldMinPlacement:  { def: 90,   min: 75,  max: 100 },   // ...and only while 7-day placement is at least this
   coldDailyCap:      { def: 30,   min: 1,   max: 50 },    // cold emails per inbox per day, across all campaigns
-  publicUrl:         { def: "" },
+  publicUrl:         { def: "" },   // where the panel was last opened; used for the PitchPersona ingest link
+  linkUrl:           { def: "" },   // optional address on a sending domain for links inside campaign emails
   replyWebhookUrl:   { def: "" },
   aiEnabled:         { def: true },
   aiModel:           { def: "anthropic/claude-haiku-4.5" },
@@ -123,6 +124,11 @@ export function cleanSetting(key, value) {
   }
   if (key === "timezone") { new Intl.DateTimeFormat("en", { timeZone: String(value) }); }  // throws on a bad zone
   if (key === "replyWebhookUrl" && value && !/^https:\/\/[^\s/]+\/\S*$/.test(String(value))) throw new Error("The reply webhook must be an https:// URL");
+  if (key === "linkUrl") {
+    const v = String(value || "").trim().replace(/\/+$/, "");
+    if (v && !/^https:\/\/[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i.test(v)) throw new Error("The link address must look like https://go.yourdomain.com, with no path");
+    return v.toLowerCase();
+  }
   return String(value).trim().slice(0, 500);
 }
 

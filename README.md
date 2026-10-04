@@ -39,6 +39,16 @@ Also give every inbox a profile photo and a plain signature, and add both domain
 
 Railway builds from the `Dockerfile` (Node 22) and health-checks `/health`.
 
+### Your own address (mailer.pitchpersona.app)
+
+1. In Railway, open the service, then **Settings**, then **Networking**, and add a **Custom Domain**: `mailer.pitchpersona.app`. Railway shows the DNS record(s) to add.
+2. At the DNS host for pitchpersona.app (Hostinger), add exactly those records: a CNAME named `mailer`, plus any verification TXT record Railway lists.
+3. Wait for Railway to show the domain as active. It issues the HTTPS certificate itself. Then sign in at the new address.
+
+A subdomain is used rather than a path like pitchpersona.app/mailer: the main site runs on Vercel, and the panel expects to sit at the root of its own address.
+
+**Before the first campaign**, give campaign emails their own link address on a sending domain, for example `go.getpitchpersona.com`, added the same way as a second custom domain. Enter it under Settings, Cold email safety, **Address for links in campaign emails**. Unsubscribe and click-tracking links then use it, so your main domain never appears in cold email. The panel warns you if a campaign would send links on another domain.
+
 ### Moving the existing service over from pitchpersona-backend
 
 The mailer used to live in the `mailer` folder of `pitchpersona-backend`. To point the running service at this repo without losing anything:

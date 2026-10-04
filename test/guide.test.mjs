@@ -59,6 +59,10 @@ try {
   ok(st.totals.sentEver >= 0 && st.totals.seenEver >= 0 && st.campaigns.count === 0 && st.campaigns.active === 0, "the guide gets totals and campaign counts", JSON.stringify(st.campaigns));
   ok(st.domains.length === 1 && "signing" in st.domains[0], "each sending domain reports its DKIM signing status", JSON.stringify(st.domains[0]).slice(0, 120));
   ok(st.settings.dkimConfirmed === false, "DKIM signing starts unconfirmed");
+  r = await api("/api/settings", "PUT", { linkUrl: "go.getpitchpersona.com/track" });
+  ok(r.status === 400 && /link address/.test(r.body.error), "a link address without https or with a path is refused", JSON.stringify(r.body));
+  await api("/api/settings", "PUT", { linkUrl: "https://Go.GetPitchPersona.com/" });
+  ok((await api("/api/state")).body.settings.linkUrl === "https://go.getpitchpersona.com", "the link address is saved tidied");
   await api("/api/settings", "PUT", { dkimConfirmed: true });
   ok((await api("/api/state")).body.settings.dkimConfirmed === true, "'I've clicked Start authentication' is remembered");
 } finally { dry.stop(); }

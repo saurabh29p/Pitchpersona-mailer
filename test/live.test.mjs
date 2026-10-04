@@ -24,7 +24,8 @@ const backdate = () => db.prepare("UPDATE messages SET sent_at = ?").run(new Dat
 const day = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
 try {
 const login = await api("/api/login", "POST", { password: "livepass" }, { "x-forwarded-host": "mailer.test", "x-forwarded-proto": "https" });
-ok((await api("/api/settings", "PUT", { requireDns: false, aiEnabled: true, openrouterKey: "sk-or-test", timezone: "UTC" })).status === 200, "settings saved");
+// The panel is opened on mailer.test, but links in campaign emails must use the link address on a sending domain.
+ok((await api("/api/settings", "PUT", { requireDns: false, aiEnabled: true, openrouterKey: "sk-or-test", timezone: "UTC", linkUrl: "https://go.getpitchpersona.test/" })).status === 200, "settings saved");
 const mk = (email, role, password = "good-pass", name = "Saurabh Singh") => api("/api/inboxes", "POST", { email, role, password, name, provider: "custom",
   smtp_host: "127.0.0.1", smtp_port: mocks.smtpPort, imap_host: "127.0.0.1", imap_port: mocks.imapPort, start_date: day(30) });
 const A = (await mk("a@getpitchpersona.test", "sender")).body.id;
@@ -65,9 +66,9 @@ if (mail) mail.raw = mail.raw.replace(/\r?\n[ \t]+/g, " ").replace(/=\r?\n/g, ""
 if (mail) {
   ok(/^From: "?Saurabh Singh"? <a@getpitchpersona\.test>/m.test(mail.raw), "From shows the sender name");
   ok(/^Subject: Quick question, Okay/m.test(mail.raw), "subject rendered");
-  ok(/^List-Unsubscribe: <https:\/\/mailer\.test\/u\/[A-Za-z0-9_-]+>, <mailto:a@getpitchpersona\.test\?subject=unsubscribe>/m.test(mail.raw), "List-Unsubscribe header with link and mailto");
+  ok(/^List-Unsubscribe: <https:\/\/go\.getpitchpersona\.test\/u\/[A-Za-z0-9_-]+>, <mailto:a@getpitchpersona\.test\?subject=unsubscribe>/m.test(mail.raw), "List-Unsubscribe uses the link address, not the panel's, plus a mailto");
   ok(/^List-Unsubscribe-Post: List-Unsubscribe=One-Click/m.test(mail.raw), "one-click unsubscribe header");
-  ok(/https:\/\/mailer\.test\/c\/[A-Za-z0-9_-]+\?u=https%3A%2F%2Fexample\.com%2Fpage/.test(mail.raw), "link rewritten for click tracking");
+  ok(/https:\/\/go\.getpitchpersona\.test\/c\/[A-Za-z0-9_-]+\?u=https%3A%2F%2Fexample\.com%2Fpage/.test(mail.raw) && !/mailer\.test/.test(mail.raw), "link rewritten for click tracking on the link address");
   ok(!/text\/html/i.test(mail.raw), "plain text only (open tracking off)");
 }
 const warm = (await received()).find((m) => m.to.includes("seed@seedmail.test"));

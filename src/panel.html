@@ -362,6 +362,7 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
           <label class="f">Warm-up days before campaigns<input name="coldMinWarmDays" type="number" step="1"></label>
           <label class="f">Minimum placement for campaigns (%)<input name="coldMinPlacement" type="number" step="1"></label>
           <label class="f">Campaign emails per inbox per day<input name="coldDailyCap" type="number" step="1"></label>
+          <label class="f full">Address for links in campaign emails (optional)<input name="linkUrl" placeholder="https://go.getpitchpersona.com"><span class="muted small">Campaign emails carry an unsubscribe link, and rewritten links when click tracking is on. Point a subdomain of a sending domain at this service and enter it here, so your main domain never appears in cold email. Empty uses the address you open this panel on.</span></label>
           <label class="f full">Send replies to PitchPersona (optional)<input name="replyWebhookUrl" placeholder="https://api.pitchpersona.app/webhooks/instantly/..."><span class="muted small">Paste the Instantly reply address from PitchPersona's settings, and every reply shows up on that prospect's timeline. Leave empty to keep the tools separate.</span></label>
         </div>
       </div>
@@ -549,6 +550,8 @@ function render(){
   S.domains.filter(d=>d.signing&&!['pass','signed'].includes(d.signing.result)).forEach(d=>probs.push(['warn',`Mail from ${esc(d.domain)} isn't signed with your DKIM key yet (${esc(d.signing.result==='unaligned'?"Google's default key was used":'dkim='+d.signing.result)}). In Google Admin open Apps, Google Workspace, Gmail, Authenticate email, pick ${esc(d.domain)} and click Start authentication.`]));
   if(!s.aiKeySet&&s.aiEnabled) probs.push(['warn','No OpenRouter key saved, so emails use the built-in templates. Add a key in Settings.']);
   if(!s.requireDns) probs.push(['bad','The DNS safety gate is turned off in Settings.']);
+  const lh=linkHost();
+  if(S.campaigns?.count&&lh&&!onSendingDomain(lh)) probs.push(['warn',`Links in campaign emails would point at <b>${esc(lh)}</b>, which isn't one of your sending domains. Before a campaign sends, set an address on a sending domain under Settings, Cold email safety.`]);
   const lvl=probs.some(p=>p[0]==='bad')?'bad':probs.length?'warn':'good';
   $('#banners').innerHTML=probs.length?`<div class="banner ${lvl}"><b>${probs.length} thing${probs.length>1?'s':''} to check</b><ul>${probs.map(p=>`<li>${p[1]}</li>`).join('')}</ul></div>`
     :`<div class="banner good"><b>All safety checks pass.</b> <span class="muted small">Last cycle ${fmtTime(sc.lastTickAt)} · next ${fmtTime(sc.nextTickAt)}</span></div>`;
@@ -690,6 +693,10 @@ const ramp=d=>{const s=S.settings;return Math.min(s.rampCap,s.rampStart+s.rampPe
 const plural=(n,one,many)=>`${n} ${n===1?one:(many||one+'s')}`;
 const ext=(href,text)=>`<a href="${href}" target="_blank" rel="noopener">${text}</a>`;
 
+// The host that links in campaign emails will use, and whether it sits on one of the sending domains.
+function linkHost(){try{return new URL(S.settings.linkUrl||S.settings.publicUrl).host;}catch{return '';}}
+function onSendingDomain(h){return S.domains.some(d=>h===d.domain||h.endsWith('.'+d.domain));}
+
 function guideSteps(){
   const s=S.settings,R=S.readiness||{},t=S.totals,ins=S.inboxes,snd=ins.filter(i=>i.role==='sender'),seeds=ins.length-snd.length;
   const doms=S.domains,pw=ins.filter(i=>i.hasPassword),okLogin=ins.filter(i=>i.login==='ok'),badLogin=ins.filter(i=>i.login==='failed'),untested=pw.filter(i=>i.login!=='ok');
@@ -751,6 +758,7 @@ function guideSteps(){
     {id:'campaign',title:'Launch your first campaign',done:S.campaigns.active>0,
       status:S.campaigns.active?`${plural(S.campaigns.active,'campaign')} switched on`:S.campaigns.count?`${plural(S.campaigns.count,'campaign')} drafted, none switched on`:'After warm-up',
       body:`<ol><li>Open Campaigns and press <b>New campaign</b>. Start from the PitchPersona sequence or write your own.</li><li>Add leads: paste a CSV, or point PitchPersona's Custom webhook at the campaign's ingest address.</li><li>Pick the sending inboxes, preview a few emails, then press <b>Start sending</b>. Begin at 10 to 15 a day per inbox.</li></ol>
+        ${linkHost()&&!onSendingDomain(linkHost())?`<p class="prob">Links in campaign emails would point at ${esc(linkHost())}. Point a subdomain of a sending domain (for example go.${esc(S.domains[0]?.domain||'yourdomain.com')}) at this service and enter it under Settings, Cold email safety.</p>`:''}
         <p class="note">You can build a campaign now. It waits until an inbox has earned it.</p><div class="acts"><button class="btn sm" data-goto="campaigns">Open Campaigns</button></div>`},
   ];
 }
@@ -827,7 +835,7 @@ const HELP={
   sBehaviour:{t:'Behaviour',b:`<ul><li><b>Reply rate</b>: the share of warm-up emails that get a reply.</li><li><b>Star rate</b>: the share that get starred.</li><li><b>Max replies per thread</b>: how long a back-and-forth can get.</li><li><b>Share sent to seeds</b>: how much goes to your outside inboxes.</li><li><b>Reply delay</b>: replies wait a random time in this range.</li></ul>`},
   sSafety:{t:'Safety',b:`<p>Placement is checked per inbox over the last few days. Below the first number its volume halves. Below the second, it pauses itself.</p><p>Keep <b>Block sending until SPF, DKIM and DMARC are set</b> on.</p>`},
   sAi:{t:'AI writer',b:`<p>Writes each warm-up email with an AI model through OpenRouter, so no two look alike. Links and em dashes are removed from what it writes.</p><p>Get a key at openrouter.ai/keys. <b>Write a test email</b> shows one without sending it. With no key, built-in templates are used.</p>`},
-  sCold:{t:'Cold email safety',b:`<p>An inbox can send campaigns only after this many warm-up days, and only while its 7-day placement is at or above the minimum.</p><p><b>Campaign emails per inbox per day</b> is the total across all campaigns.</p><p>The PitchPersona reply address is optional. With it, replies show up on that prospect in PitchPersona.</p>`},
+  sCold:{t:'Cold email safety',b:`<p>An inbox can send campaigns only after this many warm-up days, and only while its 7-day placement is at or above the minimum.</p><p><b>Campaign emails per inbox per day</b> is the total across all campaigns.</p><p><b>Address for links</b>: campaign emails carry an unsubscribe link. Put it on a subdomain of a sending domain, never your main domain.</p><p>The PitchPersona reply address is optional. With it, replies show up on that prospect in PitchPersona.</p>`},
   sDnc:{t:'Do-not-email list',b:`<p>Nobody on this list gets a campaign email. Bounces, unsubscribes, "remove me" replies and anyone who replied are added automatically.</p><p>Add <code>@company.com</code> to block a whole company.</p>`},
 };
 const pop=document.createElement('div'); pop.className='pop hidden'; pop.setAttribute('role','dialog'); document.body.appendChild(pop);
@@ -877,12 +885,12 @@ function fillSettings(){
   f.requireDns.checked=s.requireDns; f.aiEnabled.checked=s.aiEnabled; f.aiModel.value=s.aiModel; f.topics.value=s.topics.join('\n'); f.openrouterKey.value='';
   f.openrouterKey.placeholder=s.aiKeySet?(s.aiKeyFromEnv?'Set in Railway variables':'Saved (encrypted). Type to replace'):'sk-or-...';
   $('#aiKeyNote').textContent=s.aiKeySet?'Key is set.':'No key yet.';
-  f.replyWebhookUrl.value=s.replyWebhookUrl||'';
+  f.replyWebhookUrl.value=s.replyWebhookUrl||''; f.linkUrl.value=s.linkUrl||'';
   rampPreview(); loadSuppression();
 }
 $('#settingsForm').addEventListener('input',e=>{if(['rampStart','rampPerDay','rampCap','weekendFactor'].includes(e.target.name))rampPreview();});
 $('#settingsForm').onsubmit=async e=>{
-  e.preventDefault(); const f=e.target, body={timezone:f.timezone.value,requireDns:f.requireDns.checked,aiEnabled:f.aiEnabled.checked,aiModel:f.aiModel.value.trim(),topics:f.topics.value,replyWebhookUrl:f.replyWebhookUrl.value.trim()};
+  e.preventDefault(); const f=e.target, body={timezone:f.timezone.value,requireDns:f.requireDns.checked,aiEnabled:f.aiEnabled.checked,aiModel:f.aiModel.value.trim(),topics:f.topics.value,replyWebhookUrl:f.replyWebhookUrl.value.trim(),linkUrl:f.linkUrl.value.trim()};
   NUMS.forEach(k=>body[k]=Number(f[k].value));
   if(f.openrouterKey.value.trim())body.openrouterKey=f.openrouterKey.value.trim();
   if(!body.requireDns&&S.settings.requireDns&&!confirm('Turn off the DNS safety gate? Unauthenticated domains will be allowed to send.'))return;
