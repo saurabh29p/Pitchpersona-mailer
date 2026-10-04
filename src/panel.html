@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Warm-up Control</title>
+<title>PitchPersona Mailer</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
 <style>
@@ -80,17 +80,27 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--surface);padding:10px 16px;border-radius:10px;font-size:14px;display:none;z-index:20;max-width:calc(100vw - 32px)}
 #login{min-height:100vh;display:grid;place-items:center;padding:16px}
 #login .card{width:min(380px,100%)}
+.subnav{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line)}
+.subnav button{border:0;background:none;padding:8px 12px;border-bottom:2px solid transparent;cursor:pointer;color:var(--text-2);white-space:nowrap}
+.subnav button[aria-selected=true]{color:var(--accent-text);border-color:var(--accent);font-weight:600}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--text-2)}
+.chip[aria-pressed=true]{border-color:var(--accent);color:var(--accent-text);font-weight:600}
+code{font-family:ui-monospace,monospace;font-size:12px;background:var(--surface-2);padding:1px 5px;border-radius:5px}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--surface-2)}
+.step textarea,.step input{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--text);width:100%}
+.step textarea{font:13px/1.5 ui-monospace,monospace;min-height:140px}
+.prev{white-space:pre-wrap;background:var(--surface-2);border-radius:8px;padding:10px;font-size:13px;margin:6px 0 0}
 .hidden{display:none!important}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}.kv dt{color:var(--text-2)}.kv dd{margin:0;word-break:break-all}
 .grid>.card{margin:0}.grid{margin-bottom:16px}
-@media (max-width:640px){.tile .val{font-size:24px}.hide-sm{display:none}header{position:static}.hrow{gap:8px}.hrow h1{flex-basis:100%}.big{padding:8px 14px}.tile{padding:12px}}
+@media (max-width:640px){.tile .val{font-size:24px}.hide-sm{display:none}header{position:static}.hrow{gap:8px}.hrow h1{flex-basis:100%}.big{padding:8px 14px}.tile{padding:12px}.g4{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}
 </style>
 </head>
 <body>
 
 <div id="login" class="hidden">
   <form class="card" id="loginForm">
-    <h2><span class="brand">P</span>Warm-up control panel</h2>
+    <h2><span class="brand">P</span>PitchPersona Mailer</h2>
     <p class="muted small">Sign in with the PANEL_PASSWORD you set in Railway.</p>
     <label class="f">Password<input type="password" id="pw" autocomplete="current-password" required></label>
     <p id="loginErr" class="small" style="color:var(--bad-text)"></p>
@@ -101,7 +111,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 <div id="app" class="hidden">
 <header>
   <div class="hrow">
-    <h1><span class="brand">P</span>PitchPersona warm-up</h1>
+    <h1><span class="brand">P</span>PitchPersona Mailer</h1>
     <span id="statusPill" class="pill">Loading</span>
     <button class="btn big" id="toggleBtn">Start</button>
     <button class="btn" id="runBtn" title="Runs one cycle now, outside working hours too. Every limit still applies.">Run a cycle now</button>
@@ -110,6 +120,8 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <nav role="tablist">
     <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
     <button role="tab" data-tab="inboxes" aria-selected="false">Inboxes</button>
+    <button role="tab" data-tab="campaigns" aria-selected="false">Campaigns</button>
+    <button role="tab" data-tab="replies" aria-selected="false">Replies <span id="replyBadge" class="pill bad hidden" style="padding:0 7px"></span></button>
     <button role="tab" data-tab="activity" aria-selected="false">Activity</button>
     <button role="tab" data-tab="settings" aria-selected="false">Settings</button>
     <button role="tab" data-tab="help" aria-selected="false">How it works</button>
@@ -136,6 +148,79 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     <div id="inboxCards" class="grid g2"></div>
   </section>
 
+
+  <!-- CAMPAIGNS -->
+  <section data-panel="campaigns" class="hidden">
+    <div id="campList">
+      <div class="row spread" style="margin-bottom:12px"><p class="muted small" style="margin:0;flex:1;min-width:220px">Cold email campaigns. An inbox sends campaigns only after its warm-up has earned it (enough warm-up days and healthy placement). Warm-up keeps running alongside.</p><button class="btn primary" id="newCampBtn">New campaign</button></div>
+      <div class="card" id="coldEligibility"></div>
+      <div id="campCards" class="grid g2"></div>
+    </div>
+    <div id="campView" class="hidden">
+      <div class="row spread" style="margin-bottom:12px">
+        <div class="row"><button class="btn sm" id="campBack">← Campaigns</button><h2 id="campTitle" style="margin:0"></h2><span id="campStatus" class="pill"></span></div>
+        <div class="row"><button class="btn sm" id="campTestBtn">Send a test</button><button class="btn sm danger" id="campArchive">Archive</button><button class="btn big" id="campToggle">Start</button></div>
+      </div>
+      <div class="grid g4" id="campTiles"></div>
+      <div class="card"><h2>Sent and replies per day</h2><div class="legend"><span><i style="background:var(--s1)"></i>Sent</span><span><i style="background:var(--s2)"></i>Replies</span></div><div class="chart" id="chCamp"></div></div>
+      <nav class="subnav" style="padding:0;margin:0 0 12px;max-width:none">
+        <button data-sub="leads" aria-selected="true">Leads</button><button data-sub="sequence" aria-selected="false">Sequence</button>
+        <button data-sub="schedule" aria-selected="false">Schedule &amp; inboxes</button><button data-sub="add" aria-selected="false">Add leads</button>
+      </nav>
+      <div data-subpanel="leads">
+        <div class="card">
+          <div class="row spread"><div class="row" id="leadChips"></div><input id="leadSearch" class="btn sm" placeholder="Search" style="min-width:160px"></div>
+          <div class="row" style="margin:10px 0"><button class="btn sm primary" data-bulk="approve">Approve selected</button><button class="btn sm" data-bulk="approve-all">Approve all in review</button><button class="btn sm" data-bulk="skip">Skip selected</button><button class="btn sm" data-bulk="requeue">Retry selected</button><button class="btn sm danger" data-bulk="delete">Delete unsent</button></div>
+          <div class="scroll"><table id="leadTable"></table></div>
+          <p class="muted small" id="leadCount"></p>
+        </div>
+      </div>
+      <div data-subpanel="sequence" class="hidden">
+        <div class="card"><p class="muted small" style="margin-top:0">Use variables like <code>{{first_name}}</code> or give a fallback with <code>{{first_name|there}}</code>. A lead with an unfilled variable is held back instead of getting a broken email. Click a variable to insert it.</p><div class="row" id="varChips"></div></div>
+        <div id="stepList"></div>
+        <div class="row"><button class="btn" id="addStepBtn">Add step</button><button class="btn primary" id="saveSeqBtn">Save sequence</button><button class="btn" id="previewBtn">Preview with a lead</button></div>
+      </div>
+      <div data-subpanel="schedule" class="hidden">
+        <form id="schedForm">
+          <div class="card"><h2>Inboxes</h2><div id="schedInboxes" class="ibox"></div></div>
+          <div class="card"><h2>When</h2><div class="form">
+            <label class="f">Start hour<input name="start_hour" type="number" min="0" max="23"></label><label class="f">End hour<input name="end_hour" type="number" min="1" max="24"></label>
+            <label class="f">Per inbox per day (max 50)<input name="daily_limit" type="number" min="1" max="50"></label>
+            <label class="f">Gap between sends, min (minutes)<input name="gap_min" type="number" min="2"></label><label class="f">Gap, max (minutes)<input name="gap_max" type="number" min="2"></label>
+            <div class="full row" id="dayBoxes"></div></div>
+            <p class="muted small">Times use the time zone in Settings. Each inbox also follows the cold cap from Settings, across all campaigns.</p></div>
+          <div class="card"><h2>Rules</h2><div class="form">
+            <label class="toggle full"><input type="checkbox" name="review"><span><b>Review new leads before they're sent</b><br><span class="muted small">Leads from PitchPersona or a CSV wait in "Review" until you approve them.</span></span></label>
+            <label class="toggle full"><input type="checkbox" name="stop_on_reply"><span><b>Stop the sequence when someone replies</b></span></label>
+            <label class="toggle full"><input type="checkbox" name="track_clicks"><span><b>Track link clicks</b><br><span class="muted small">Links are rewritten through this server. Fine for most sends.</span></span></label>
+            <label class="toggle full"><input type="checkbox" name="track_opens"><span><b>Track opens (not recommended)</b><br><span class="muted small">Adds an image and an HTML part. This hurts deliverability on new domains, and Apple Mail fakes most opens anyway.</span></span></label>
+            <label class="f full">Signature (added to every step)<textarea name="signature" rows="3"></textarea></label>
+            <label class="f full">Opt-out line (added to every step, optional)<input name="opt_out_line"></label></div></div>
+          <button class="btn primary big">Save schedule</button>
+        </form>
+      </div>
+      <div data-subpanel="add" class="hidden">
+        <div class="card"><h2>From PitchPersona (optional)</h2>
+          <p class="small">PitchPersona's <b>Custom webhook</b> export can send prospects and their written sequence straight here, with no change to PitchPersona. In PitchPersona, open Settings and paste this as the webhook URL, then push prospects with <b>Webhook</b>.</p>
+          <div class="row"><input id="ingestUrl" readonly class="btn" style="flex:1;min-width:220px;font-family:ui-monospace,monospace;font-size:12px"><button class="btn sm" id="copyIngest">Copy</button><button class="btn sm" id="rotateIngest">New link</button></div>
+          <p class="muted small" id="ingestNote"></p>
+        </div>
+        <div class="card"><h2>From a CSV</h2>
+          <p class="muted small">Needs an <b>email</b> column. Other columns (first_name, company, or anything else) become variables. PitchPersona CSV exports work as they are.</p>
+          <input type="file" id="csvFile" accept=".csv,text/csv"><div id="csvPreview" class="small" style="margin-top:8px"></div>
+          <button class="btn primary" id="csvImport" disabled style="margin-top:8px">Import</button>
+        </div>
+        <div class="card"><h2>Paste</h2><p class="muted small">One per line: <code>email, first name, company</code></p><label class="f"><textarea id="pasteLeads" rows="5"></textarea></label><button class="btn" id="pasteImport" style="margin-top:8px">Add leads</button></div>
+        <div id="importOut" class="small"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- REPLIES -->
+  <section data-panel="replies" class="hidden">
+    <div class="card"><div class="row spread"><h2>Replies</h2><div class="row"><select id="replyFilter" class="btn sm"><option value="">All</option><option value="reply">Replies</option><option value="auto">Auto-replies</option><option value="unsubscribe">Asked to stop</option><option value="bounce">Bounces</option></select><button class="btn sm" id="markRead">Mark all read</button></div></div>
+      <p class="muted small">Every reply stops that lead's sequence and keeps them out of future campaigns. Answer replies from your normal inbox. Tap a row to see the whole conversation.</p><div id="replyList"></div></div>
+  </section>
   <!-- ACTIVITY -->
   <section data-panel="activity" class="hidden">
     <div class="card"><div class="row spread"><h2>Recent emails</h2><select id="mailFilter" class="btn sm"><option value="">All inboxes</option></select></div><p class="muted small">Tap an email to read it. The tag shows where it landed once the receiving inbox was checked.</p><div id="mailList"></div></div>
@@ -191,6 +276,19 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
           <pre id="aiOut" class="full hidden" style="white-space:pre-wrap;background:var(--surface-2);padding:10px;border-radius:8px;margin:0;font-size:13px"></pre>
         </div>
       </div>
+      <div class="card"><h2>Cold email safety</h2>
+        <div class="form">
+          <label class="f">Warm-up days before campaigns<input name="coldMinWarmDays" type="number" step="1"></label>
+          <label class="f">Minimum placement for campaigns (%)<input name="coldMinPlacement" type="number" step="1"></label>
+          <label class="f">Campaign emails per inbox per day<input name="coldDailyCap" type="number" step="1"></label>
+          <label class="f full">Send replies to PitchPersona (optional)<input name="replyWebhookUrl" placeholder="https://api.pitchpersona.app/webhooks/instantly/..."><span class="muted small">Paste the Instantly reply address from PitchPersona's settings, and every reply shows up on that prospect's timeline. Leave empty to keep the tools separate.</span></label>
+        </div>
+      </div>
+      <div class="card"><h2>Do-not-email list</h2>
+        <p class="muted small">Bounces, unsubscribes and anyone who replied are added automatically. Add addresses or whole domains (<code>@competitor.com</code>), separated by spaces or new lines.</p>
+        <div class="row"><textarea id="supAdd" rows="2" style="flex:1;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px;color:var(--text)"></textarea><button type="button" class="btn" id="supAddBtn">Add</button></div>
+        <div id="supList" class="small" style="margin-top:10px;max-height:260px;overflow:auto"></div>
+      </div>
       <div class="card"><h2>Topics</h2>
         <p class="muted small">One per line. Each new email is about a random topic from this list.</p>
         <label class="f"><textarea name="topics" rows="8"></textarea></label>
@@ -217,6 +315,15 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
         <li><b>Auto-pause:</b> an inbox pauses if placement falls below the auto-pause line, if the provider refuses a send (spam, rate limit, blocked), or if 3 sends fail in a row.</li>
         <li><b>Clean content:</b> plain text only, with no links, images or tracking. Links are stripped even when the AI writes one.</li>
         <li><b>Working hours only</b>, with lower volume on weekends.</li>
+      </ul>
+    </div>
+    <div class="card"><h2>Campaigns</h2>
+      <ul>
+        <li>An inbox joins a campaign only after its warm-up has earned it. By default that's 14 days and 90% placement, and it never sends more than the cold cap a day.</li>
+        <li>Emails go out one at a time inside the campaign's hours, with a random gap between them. Follow-ups reply in the same thread.</li>
+        <li>A reply stops that person's sequence and keeps them out of every other campaign. Bounces, unsubscribes and "remove me" replies go on the do-not-email list.</li>
+        <li>An inbox pauses itself if more than 5% of its recent campaign emails bounce.</li>
+        <li>A lead with an unfilled variable is held back, so nobody gets "Hi {{first_name}}".</li>
       </ul>
     </div>
     <div class="card"><h2>When to start cold email</h2>
@@ -265,6 +372,12 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   </form>
 </dialog>
 
+<dialog id="leadDlg"><div id="leadBody"></div><div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" id="leadClose">Close</button></div></dialog>
+<dialog id="newCampDlg"><form id="newCampForm" method="dialog"><h2>New campaign</h2><div class="form">
+  <label class="f full">Name<input name="name" required placeholder="Founder-led SaaS, October"></label>
+  <label class="f full">Start from<select name="preset"><option value="pitchpersona">PitchPersona sequence (uses the emails PitchPersona wrote)</option><option value="blank">My own template</option></select></label></div>
+  <div class="row" style="justify-content:flex-end;margin-top:12px"><button type="button" class="btn" id="newCampCancel">Cancel</button><button class="btn primary" value="save">Create</button></div></form></dialog>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -287,7 +400,7 @@ $('#logoutBtn').onclick=async()=>{await api('/api/logout',{method:'POST'}).catch
 
 $$('nav button').forEach(b=>b.onclick=()=>go(b.dataset.tab));
 function go(t){tab=t;$$('nav button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));$$('[data-panel]').forEach(p=>p.classList.toggle('hidden',p.dataset.panel!==t));
-  if(t==='activity')loadMail(); if(t==='settings')fillSettings(); try{localStorage.setItem('ww-tab',t)}catch{} }
+  if(t==='activity')loadMail(); if(t==='settings')fillSettings(); if(t==='campaigns')loadCampaigns(); if(t==='replies')loadReplies(); try{localStorage.setItem('ww-tab',t)}catch{} }
 document.addEventListener('click',e=>{const g=e.target.closest('[data-goto]');if(g)go(g.dataset.goto);});
 
 async function load(first){
@@ -314,7 +427,7 @@ function render(){
   // Safety banners
   const probs=[], senders=S.inboxes.filter(i=>i.role==='sender');
   if(!S.inboxes.length) probs.push(['warn','Add your inboxes in the Inboxes tab to begin.']);
-  S.domains.filter(d=>!d.ok).forEach(d=>probs.push(['bad',`${esc(d.domain)} is missing ${['spf','dkim','dmarc'].filter(k=>!d[k]).map(k=>k.toUpperCase()).join(', ')}. Sending from it is blocked${s.requireDns?'':' <b>(the DNS gate is OFF in Settings)</b>'}.`]));
+  S.domains.filter(d=>!d.ok).forEach(d=>probs.push(['bad',`${esc(d.domain)} is missing ${['spf','dkim','dmarc'].filter(k=>!d[k]).map(k=>k.toUpperCase()).join(', ')}. ${s.requireDns?'Sending from it is blocked.':' <b>The DNS gate is off in Settings, so it can still send, and its mail will likely land in spam.</b>'}`]));
   S.inboxes.filter(i=>i.paused&&i.pause_reason).forEach(i=>probs.push(['bad',`${esc(i.email)} paused itself: ${esc(i.pause_reason)}`]));
   S.inboxes.filter(i=>!i.hasPassword).forEach(i=>probs.push(['warn',`${esc(i.email)} has no app password saved.`]));
   if(!s.aiKeySet&&s.aiEnabled) probs.push(['warn','No OpenRouter key saved, so emails use the built-in templates. Add a key in Settings.']);
@@ -327,10 +440,10 @@ function render(){
   const t=S.totals, plc=t.placement7d;
   const plcCls=plc==null?'':plc>=90?'good':plc>=s.autoPauseBelow?'warn':'bad';
   $('#tiles').innerHTML=[
-    ['Sent today',t.sentToday,`${t.repliesToday} of them replies`],
+    ['Warm-up sent today',t.sentToday,`${t.repliesToday} of them replies`],
     ['Inbox placement, 7 days',plc==null?'–':plc+'%',plc==null?'Not enough data yet':`<span class="pill ${plcCls}">${plc>=90?'Healthy':plc>=s.autoPauseBelow?'Watch':'At risk'}</span>`],
     ['Rescued from spam, 7 days',t.rescued7d,'Moved back to the inbox'],
-    ['Replies waiting',t.queued,'Sent after a random delay'],
+    ['Warm-up replies queued',t.queued,'Sent after a random delay'],
   ].map(([l,v,sub])=>`<div class="card tile"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${sub}</div></div>`).join('');
 
   barChart($('#chVolume'),S.daily.map(d=>({x:d.day,parts:[d.sent-d.replies,d.replies]})),['var(--s1)','var(--s2)'],['New','Replies']);
@@ -346,7 +459,7 @@ function render(){
     :`<tr><td colspan="6" class="muted">No inboxes yet.</td></tr>`);
 
   // Domains
-  $('#domains').innerHTML=S.domains.length?S.domains.map(d=>`<div class="card" style="margin:0;background:var(--surface-2)"><div class="row spread"><h3>${esc(d.domain)}</h3><span class="pill ${d.ok?'good':'bad'}">${d.ok?'Ready to send':'Blocked'}</span></div>
+  $('#domains').innerHTML=S.domains.length?S.domains.map(d=>`<div class="card" style="margin:0;background:var(--surface-2)"><div class="row spread"><h3>${esc(d.domain)}</h3><span class="pill ${d.ok?'good':'bad'}">${d.ok?'Ready to send':S.settings.requireDns?'Blocked':'Not authenticated'}</span></div>
     <dl class="kv" style="margin-top:8px">${['spf','dkim','dmarc'].map(k=>`<dt>${k.toUpperCase()}</dt><dd>${d[k]?`<span style="color:var(--good-text)">✓</span> <span class="muted">${esc(d[k].slice(0,70))}</span>`:`<span style="color:var(--bad-text)">✗ missing</span>${k==='dkim'?` <span class="muted">(tried selector ${esc((d.selectorsTried||[]).join(', ')||'google')})</span>`:''}`}</dd>`).join('')}</dl>
     <div class="muted small" style="margin-top:6px">Checked ${fmtTime(d.checkedAt)}</div></div>`).join(''):'<p class="muted">Add a sender inbox to check its domain.</p>';
 
@@ -389,7 +502,7 @@ $('#inboxCards').addEventListener('click',async e=>{
       alert(`${i.email}\n\nSending (SMTP): ${r.smtp==='ok'?'OK':'FAILED: '+r.smtp}\nReading (IMAP): ${r.imap==='ok'?'OK':'FAILED: '+r.imap}`);}
     if(b.dataset.act==='send'){b.textContent='Sending...';const r=await api(`/api/inboxes/${i.id}/send-test`,{method:'POST'});toast(`Sent to ${r.to}: "${r.subject}" (${r.by==='ai'?'AI':'template'})`);}
     if(b.dataset.act==='edit'){openInbox(i);}
-    if(b.dataset.act==='del'){if(confirm(`Remove ${i.email}? Its history stays in the stats.`)){await api('/api/inboxes/'+i.id,{method:'DELETE'});toast('Inbox removed');}}
+    if(b.dataset.act==='del'){if(confirm(`Remove ${i.email}? Its history stays in the stats. Leads it was emailing wait in review, so you can check this mailbox for replies first.`)){await api('/api/inboxes/'+i.id,{method:'DELETE'});toast('Inbox removed');}}
   }catch(err){toast(err.message);}
   await load(false);
 });
@@ -402,7 +515,7 @@ function openInbox(i){
   editing=i; form.reset(); $('#inboxErr').textContent='';
   $('#inboxDlgTitle').textContent=i?'Edit '+i.email:'Add inbox';
   form.password.placeholder=i?.hasPassword?'Saved. Leave empty to keep it':'16-character app password';
-  form.password.required=!i;
+  form.password.required=!i; form.email.readOnly=!!i;
   const v=i||{provider:'google',role:'sender',start_date:S.today,...S.providers.google};
   for(const k of ['email','name','role','provider','start_date','cap','smtp_host','smtp_port','imap_host','imap_port','dkim_selector']) if(form[k]) form[k].value=v[k]??'';
   dlg.showModal();
@@ -453,7 +566,7 @@ $('#mailFilter').onchange=loadMail;
 $('#mailList').addEventListener('click',e=>{const m=e.target.closest('.mail');if(m)m.classList.toggle('open');});
 
 // Settings
-const NUMS=['startHour','endHour','tickMinutes','rampStart','rampPerDay','rampCap','weekendFactor','replyRate','starRate','maxThreadDepth','seedShare','replyDelayMin','replyDelayMax','slowdownBelow','autoPauseBelow'];
+const NUMS=['startHour','endHour','tickMinutes','rampStart','rampPerDay','rampCap','weekendFactor','replyRate','starRate','maxThreadDepth','seedShare','replyDelayMin','replyDelayMax','slowdownBelow','autoPauseBelow','coldMinWarmDays','coldMinPlacement','coldDailyCap'];
 function fillSettings(){
   const f=$('#settingsForm'), s=S.settings;
   f.timezone.value=s.timezone;
@@ -461,11 +574,12 @@ function fillSettings(){
   f.requireDns.checked=s.requireDns; f.aiEnabled.checked=s.aiEnabled; f.aiModel.value=s.aiModel; f.topics.value=s.topics.join('\n'); f.openrouterKey.value='';
   f.openrouterKey.placeholder=s.aiKeySet?(s.aiKeyFromEnv?'Set in Railway variables':'Saved (encrypted). Type to replace'):'sk-or-...';
   $('#aiKeyNote').textContent=s.aiKeySet?'Key is set.':'No key yet.';
-  rampPreview();
+  f.replyWebhookUrl.value=s.replyWebhookUrl||'';
+  rampPreview(); loadSuppression();
 }
 $('#settingsForm').addEventListener('input',e=>{if(['rampStart','rampPerDay','rampCap','weekendFactor'].includes(e.target.name))rampPreview();});
 $('#settingsForm').onsubmit=async e=>{
-  e.preventDefault(); const f=e.target, body={timezone:f.timezone.value,requireDns:f.requireDns.checked,aiEnabled:f.aiEnabled.checked,aiModel:f.aiModel.value.trim(),topics:f.topics.value};
+  e.preventDefault(); const f=e.target, body={timezone:f.timezone.value,requireDns:f.requireDns.checked,aiEnabled:f.aiEnabled.checked,aiModel:f.aiModel.value.trim(),topics:f.topics.value,replyWebhookUrl:f.replyWebhookUrl.value.trim()};
   NUMS.forEach(k=>body[k]=Number(f[k].value));
   if(f.openrouterKey.value.trim())body.openrouterKey=f.openrouterKey.value.trim();
   if(!body.requireDns&&S.settings.requireDns&&!confirm('Turn off the DNS safety gate? Unauthenticated domains will be allowed to send.'))return;
@@ -483,18 +597,19 @@ $('#aiTestBtn').onclick=async e=>{
 // ── Charts (inline SVG, one y-axis each, hover tooltips) ──
 function tipFor(el){let t=el.querySelector('.tip');if(!t){t=document.createElement('div');t.className='tip';el.appendChild(t);}return t;}
 function bindTips(el){
-  const t=tipFor(el);
+  const t=tipFor(el);t.style.display='none';
   el.querySelectorAll('[data-tip]').forEach(r=>{
-    r.addEventListener('mouseenter',()=>{t.innerHTML=r.dataset.tip;t.style.display='block';});
-    r.addEventListener('mousemove',ev=>{const b=el.getBoundingClientRect();t.style.left=Math.min(b.width-60,Math.max(60,ev.clientX-b.left))+'px';t.style.top=(ev.clientY-b.top)+'px';});
+    const place=ev=>{const b=el.getBoundingClientRect();t.style.left=Math.min(b.width-60,Math.max(60,ev.clientX-b.left))+'px';t.style.top=(ev.clientY-b.top)+'px';};
+    r.addEventListener('mouseenter',ev=>{t.innerHTML=r.dataset.tip;place(ev);t.style.display='block';});
+    r.addEventListener('mousemove',place);
     r.addEventListener('mouseleave',()=>t.style.display='none');
   });
 }
 const niceMax=v=>{if(v<=5)return 5;const p=Math.pow(10,Math.floor(Math.log10(v)));const n=v/p;return (n<=2?2:n<=5?5:10)*p;};
-function frame(W,H,L,B,T,max,ticks){let s='';for(let k=0;k<=ticks;k++){const v=max*k/ticks,y=B-(B-T)*k/ticks;s+=`<line x1="${L}" x2="${W-4}" y1="${y}" y2="${y}" stroke="var(--grid)"/><text x="${L-6}" y="${y+4}" text-anchor="end">${Math.round(v)}</text>`;}return s;}
+function frame(W,H,L,B,T,max,ticks){if(max%ticks)ticks=max%5===0?5:max%4===0?4:2;let s='';for(let k=0;k<=ticks;k++){const v=max*k/ticks,y=B-(B-T)*k/ticks;s+=`<line x1="${L}" x2="${W-4}" y1="${y}" y2="${y}" stroke="var(--grid)"/><text x="${L-6}" y="${y+4}" text-anchor="end">${Math.round(v)}</text>`;}return s;}
 
-function barChart(el,rows,colors,names){
-  const W=520,H=220,L=34,B=190,T=10,max=niceMax(Math.max(1,...rows.map(r=>r.parts.reduce((a,b)=>a+b,0))));
+function barChart(el,rows,colors,names,size){
+  const W=size?.W||520,H=size?.H||220,L=34,B=H-30,T=10,max=niceMax(Math.max(1,...rows.map(r=>r.parts.reduce((a,b)=>a+b,0))));
   const bw=(W-L-4)/rows.length; let s=frame(W,H,L,B,T,max,4);
   rows.forEach((r,i)=>{let y=B;const x=L+i*bw+1,w=Math.max(2,bw-2);const total=r.parts.reduce((a,b)=>a+b,0);
     r.parts.forEach((v,k)=>{if(!v)return;const h=(B-T)*v/max;const top=k===r.parts.length-1||!r.parts.slice(k+1).some(Boolean);
@@ -547,5 +662,196 @@ function rampVsActual(el,i){
 
 load(true);
 </script>
+<script>
+// ── Campaigns ──
+let C={list:null,cur:null,leadStatus:'',sub:'leads',selected:new Set(),csvRows:null,lastField:null};
+const STATUS_LABEL={review:'Review',queued:'Scheduled',replied:'Replied',bounced:'Bounced',unsubscribed:'Unsubscribed',completed:'Finished',failed:'Needs a fix',skipped:'Skipped'};
+const STATUS_CLS={review:'warn',queued:'info',replied:'good',bounced:'bad',unsubscribed:'warn',completed:'',failed:'bad',skipped:''};
+const DAYS=[['1','Mon'],['2','Tue'],['3','Wed'],['4','Thu'],['5','Fri'],['6','Sat'],['7','Sun']];
+
+async function loadCampaigns(){
+  try{C.list=await api('/api/campaigns');}catch(e){toast(e.message);return;}
+  if(C.cur){await openCampaign(C.cur.id,true);return;}
+  renderCampList();
+}
+function renderCampList(){
+  $('#campList').classList.remove('hidden');$('#campView').classList.add('hidden');
+  const L=C.list, el=L.eligibility;
+  $('#coldEligibility').innerHTML=`<h2>Which inboxes can send campaigns</h2><p class="muted small">Rules: at least ${L.cold.minWarmDays} warm-up days, ${L.cold.minPlacement}% or more inbox placement, and at most ${L.cold.dailyCap} campaign emails per inbox per day. You can change these in Settings.</p>`+
+    (el.length?`<div class="scroll"><table>${el.map(i=>`<tr><td>${esc(i.email)}</td><td>${i.ok?'<span class="pill good">Ready</span>':`<span class="pill warn">Not yet</span> <span class="muted small">${esc(i.reason)}</span>`}</td></tr>`).join('')}</table></div>`:'<p class="muted">Add sender inboxes first.</p>');
+  $('#campCards').innerHTML=L.campaigns.length?L.campaigns.map(c=>{const st=c.stats;return `<div class="card" style="margin:0;cursor:pointer" data-camp="${c.id}">
+    <div class="row spread"><h3>${esc(c.name)}</h3>${campPill(c.status)}</div>
+    <div class="kv" style="margin-top:10px"><dt>Leads</dt><dd>${st.total}${st.counts.review?` <span class="pill warn">${st.counts.review} to review</span>`:''}</dd><dt>Sent</dt><dd>${st.sent}</dd>
+    <dt>Replied</dt><dd>${st.replied}${st.replyRate!=null?` (${st.replyRate}%)`:''}</dd><dt>Bounced</dt><dd>${st.bounced}</dd></div></div>`;}).join(''):'<div class="card muted">No campaigns yet.</div>';
+}
+const campPill=st=>`<span class="pill ${st==='active'?'good':st==='paused'?'warn':''}">${st==='active'?'Sending':st==='paused'?'Paused':'Draft'}</span>`;
+$('#campCards').addEventListener('click',e=>{const c=e.target.closest('[data-camp]');if(c)openCampaign(Number(c.dataset.camp));});
+$('#campBack').onclick=()=>{C.cur=null;C.selected.clear();loadCampaigns();};
+
+// New campaign
+$('#newCampBtn').onclick=()=>{$('#newCampForm').reset();$('#newCampDlg').showModal();};
+$('#newCampCancel').onclick=()=>$('#newCampDlg').close();
+$('#newCampForm').onsubmit=async e=>{if(e.submitter?.value!=='save')return;e.preventDefault();
+  try{const r=await api('/api/campaigns',{method:'POST',body:Object.fromEntries(new FormData(e.target))});$('#newCampDlg').close();C.list=await api('/api/campaigns');await openCampaign(r.id);sub('add');}catch(err){toast(err.message);}};
+
+async function openCampaign(id,keepSub){
+  try{C.cur=await api('/api/campaigns/'+id);}catch(e){toast(e.message);return;}
+  $('#campList').classList.add('hidden');$('#campView').classList.remove('hidden');
+  const c=C.cur, st=c.stats;
+  $('#campTitle').textContent=c.name; $('#campStatus').outerHTML=`<span id="campStatus">${campPill(c.status)}</span>`;
+  $('#campToggle').textContent=c.status==='active'?'Pause':'Start sending'; $('#campToggle').className='btn big '+(c.status==='active'?'':'primary');
+  $('#campTiles').innerHTML=[['Leads',st.total,`${st.counts.review} to review · ${st.counts.queued} scheduled`],['Sent',st.sent,`${st.contacted} ${st.contacted===1?'person':'people'} contacted`],
+    ['Replied',st.replied,st.replyRate!=null?st.replyRate+'% reply rate':'No sends yet'],['Bounced',st.bounced,st.attempted?Math.round(100*st.bounced/st.attempted)+'% of emailed':'–'],
+    ...(c.track_clicks?[['Clicked',st.clicked,'People who clicked a link']]:[]),...(c.track_opens?[['Opened',st.opened,'Unreliable (Apple Mail)']]:[])]
+    .map(([l,v,s])=>`<div class="card tile"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${s}</div></div>`).join('');
+  barChart($('#chCamp'),c.daily.map(d=>({x:d.day,parts:[d.sent,d.replies]})),['var(--s1)','var(--s2)'],['Sent','Replies'],{W:Math.max(360,Math.round($('#chCamp').clientWidth||1040)),H:200});
+  renderSteps(); renderSchedule(); renderAdd(); await loadLeads();
+  if(!keepSub)sub('leads'); else sub(C.sub);
+}
+$$('.subnav button').forEach(b=>b.onclick=()=>sub(b.dataset.sub));
+function sub(t){C.sub=t;$$('.subnav button').forEach(b=>b.setAttribute('aria-selected',b.dataset.sub===t));$$('[data-subpanel]').forEach(p=>p.classList.toggle('hidden',p.dataset.subpanel!==t));}
+
+$('#campToggle').onclick=async()=>{const c=C.cur;const starting=c.status!=='active';
+  if(starting){const ready=C.list.eligibility.filter(i=>c.sender_ids.includes(i.id)&&i.ok).length;
+    if(!ready&&!confirm('None of this campaign\'s inboxes is ready for cold email yet, so nothing will send until one is. Start anyway?'))return;
+    if(c.stats.counts.review&&!confirm(`${c.stats.counts.review} leads are still waiting for review and won't be sent until you approve them. Start?`))return;}
+  try{await api(`/api/campaigns/${c.id}/status`,{method:'POST',body:{status:starting?'active':'paused'}});toast(starting?'Campaign started':'Campaign paused');}catch(e){toast(e.message);} openCampaign(c.id,true);};
+$('#campArchive').onclick=async()=>{if(!confirm(`Archive "${C.cur.name}"? Unsent leads are skipped. Sent history stays.`))return;await api('/api/campaigns/'+C.cur.id,{method:'DELETE'});C.cur=null;loadCampaigns();};
+$('#campTestBtn').onclick=async()=>{const own=S.inboxes.map(i=>i.email);const to=prompt('Send step 1 as a test to which of your inboxes?\n'+own.join('\n'),own[0]||'');if(!to)return;
+  try{const r=await api(`/api/campaigns/${C.cur.id}/test`,{method:'POST',body:{to:to.trim()}});toast(`Test sent from ${r.from} to ${r.to}`);}catch(e){toast(e.message);}};
+
+// Leads
+async function loadLeads(){
+  const c=C.cur, q=$('#leadSearch').value.trim();
+  const r=await api(`/api/campaigns/${c.id}/leads?limit=300${C.leadStatus?'&status='+C.leadStatus:''}${q?'&q='+encodeURIComponent(q):''}`).catch(e=>{toast(e.message);return{rows:[],total:0};});
+  const counts=c.stats.counts;
+  $('#leadChips').innerHTML=`<button class="chip" data-st="" aria-pressed="${!C.leadStatus}">All ${c.stats.total}</button>`+Object.keys(STATUS_LABEL).filter(k=>counts[k]).map(k=>`<button class="chip" data-st="${k}" aria-pressed="${C.leadStatus===k}">${STATUS_LABEL[k]} ${counts[k]}</button>`).join('');
+  $('#leadTable').innerHTML=`<tr><th><input type="checkbox" id="leadAll"></th><th>Lead</th><th>Status</th><th class="hide-sm">Step</th><th class="hide-sm">Next send</th><th class="hide-sm">Inbox</th></tr>`+
+    (r.rows.length?r.rows.map(l=>`<tr class="click" data-lead="${l.id}"><td><input type="checkbox" data-sel="${l.id}" ${C.selected.has(l.id)?'checked':''}></td>
+    <td><b>${esc(l.name||l.email)}</b><div class="muted small">${esc(l.email)}${l.company?' · '+esc(l.company):''}</div>${l.error?`<div class="small" style="color:var(--bad-text)">${esc(l.error)}</div>`:''}</td>
+    <td><span class="pill ${STATUS_CLS[l.status]}">${STATUS_LABEL[l.status]||l.status}</span></td><td class="hide-sm">${l.step}/${c.steps.length}</td>
+    <td class="hide-sm small">${l.status==='queued'&&l.next_at?fmtTime(l.next_at):'–'}</td><td class="hide-sm small">${esc(l.sender||'–')}</td></tr>`).join(''):`<tr><td colspan="6" class="muted">No leads here yet. Add some in "Add leads".</td></tr>`);
+  $('#leadCount').textContent=r.total>r.rows.length?`Showing ${r.rows.length} of ${r.total}. Search to narrow it down.`:'';
+}
+$('#leadChips').addEventListener('click',e=>{const b=e.target.closest('[data-st]');if(!b)return;C.leadStatus=b.dataset.st;C.selected.clear();loadLeads();});
+let searchT;$('#leadSearch').oninput=()=>{clearTimeout(searchT);searchT=setTimeout(loadLeads,300);};
+$('#leadTable').addEventListener('click',e=>{
+  if(e.target.id==='leadAll'){$$('[data-sel]').forEach(cb=>{cb.checked=e.target.checked;const id=Number(cb.dataset.sel);e.target.checked?C.selected.add(id):C.selected.delete(id);});return;}
+  const cb=e.target.closest('[data-sel]');if(cb){const id=Number(cb.dataset.sel);cb.checked?C.selected.add(id):C.selected.delete(id);return;}
+  const tr=e.target.closest('[data-lead]');if(tr)openLead(Number(tr.dataset.lead));});
+$$('[data-bulk]').forEach(b=>b.onclick=async()=>{
+  const a=b.dataset.bulk, c=C.cur; let body;
+  if(a==='approve-all'){if(!c.stats.counts.review)return toast('Nothing is waiting for review');if(!confirm(`Approve all ${c.stats.counts.review} leads in review?`))return;body={action:'approve',status:'review'};}
+  else{if(!C.selected.size)return toast('Select leads first');if(a==='delete'&&!confirm(`Delete ${C.selected.size} leads? Leads that were already emailed are kept.`))return;body={action:a,ids:[...C.selected]};}
+  try{const r=await api(`/api/campaigns/${c.id}/leads/action`,{method:'POST',body});toast(`${r.changed} lead${r.changed===1?'':'s'} updated`);C.selected.clear();openCampaign(c.id,true);}catch(e){toast(e.message);}});
+
+// Lead dialog
+async function openLead(id){
+  let L;try{L=await api('/api/leads/'+id);}catch(e){return toast(e.message);}
+  const dlg=$('#leadDlg');
+  $('#leadBody').innerHTML=`<div class="row spread"><div><h2 style="margin:0">${esc(L.name||L.email)}</h2><div class="muted small">${esc(L.email)}${L.company?' · '+esc(L.company):''}${L.title?' · '+esc(L.title):''} · ${esc(L.campaign.name)}</div></div><span class="pill ${STATUS_CLS[L.status]}">${STATUS_LABEL[L.status]}</span></div>
+    ${L.error?`<p class="small" style="color:var(--bad-text)">${esc(L.error)}</p>`:''}
+    ${L.replies.map(r=>`<div class="banner ${r.kind==='reply'?'good':r.kind==='bounce'?'bad':'warn'}" style="margin:10px 0 0"><b>${{reply:'Reply',auto:'Auto-reply',bounce:'Bounced',unsubscribe:'Asked to stop'}[r.kind]}</b> <span class="muted small">${fmtTime(r.received_at)} · to ${esc(r.inbox)}</span><div class="small">${esc(r.subject)}</div><div class="small muted">${esc(r.snippet)}</div></div>`).join('')}
+    <p class="muted small" style="margin:12px 0 4px">${L.sender?`Sends from ${esc(L.sender.email)}. `:''}Edit any step that hasn't been sent. Your edits apply to this lead only.</p>
+    ${L.preview.map(p=>`<div class="card step" style="margin:8px 0;padding:12px" data-n="${p.n}"><div class="row spread"><b>Step ${p.n}${p.n>1?` · ${p.delay_days} day${p.delay_days==1?'':'s'} later`:''}</b>${p.sent?'<span class="pill good">Sent</span>':p.empty?'<span class="pill">Empty, will be skipped</span>':p.missing.length?`<span class="pill bad">Missing ${esc(p.missing.join(', '))}</span>`:'<span class="pill info">Ready</span>'}</div>
+      ${p.sent?`<div class="prev"><b>${esc(p.subject)}</b>\n\n${esc(p.body)}</div>`:`<input data-f="subject" value="${esc(L.overrides[p.n]?.subject??p.subject)}" style="margin-top:8px" ${p.n>1&&p.subject.startsWith('Re:')?'title="Sent as a reply in the same thread"':''}><textarea data-f="body" style="margin-top:6px">${esc(L.overrides[p.n]?.body??p.body)}</textarea>${L.overrides[p.n]?'<button class="btn sm" data-reset style="margin-top:6px">Use the template again</button>':''}`}</div>`).join('')}
+    <div class="row">${['review','failed','skipped'].includes(L.status)?`<button class="btn sm primary" data-la="approve">Approve</button>`:''}${['review','queued'].includes(L.status)?`<button class="btn sm" data-la="skip">Skip this lead</button>`:''}${L.preview.some(p=>!p.sent)?'<button class="btn sm primary" id="saveLeadEdits">Save edits</button>':''}</div>
+    ${L.messages.length?`<h3 style="margin-top:14px">Sent</h3>${L.messages.map(m=>`<div class="mail" onclick="this.classList.toggle('open')"><b>${esc(m.subject)}</b> <span class="muted small">step ${m.step} · ${fmtTime(m.sent_at)} · ${esc(m.sender)}${m.clicks?` · ${m.clicks} click${m.clicks>1?'s':''}`:''}</span><pre>${esc(m.body)}</pre></div>`).join('')}`:''}`;
+  $('#leadBody').onclick=async e=>{
+    const la=e.target.closest('[data-la]');if(la){await api(`/api/campaigns/${L.campaign.id}/leads/action`,{method:'POST',body:{action:la.dataset.la,ids:[L.id]}}).catch(err=>toast(err.message));dlg.close();openCampaign(L.campaign.id,true);return;}
+    const rs=e.target.closest('[data-reset]');if(rs){const n=rs.closest('[data-n]').dataset.n;await api('/api/leads/'+L.id,{method:'PUT',body:{overrides:{[n]:null}}});openLead(L.id);return;}
+    if(e.target.id==='saveLeadEdits'){const ov={};
+      $$('#leadBody [data-n]').forEach(card=>{const n=card.dataset.n,p=L.preview.find(x=>x.n==n);const sj=card.querySelector('[data-f=subject]'),bd=card.querySelector('[data-f=body]');if(!sj)return;
+        if(sj.value!==p.subject||bd.value!==p.body||L.overrides[n])ov[n]={subject:sj.value,body:bd.value};});
+      if(!Object.keys(ov).length)return toast('No changes');
+      try{await api('/api/leads/'+L.id,{method:'PUT',body:{overrides:ov}});toast('Saved for this lead');openLead(L.id);}catch(err){toast(err.message);}}
+  };
+  if(!dlg.open)dlg.showModal();
+}
+$('#leadClose').onclick=()=>$('#leadDlg').close();
+
+// Sequence editor
+function renderSteps(){
+  const c=C.cur;
+  const vars=['first_name','name','company','title','email','sender_first_name','sender_name',...c.variables.filter(v=>!['email','name','first_name','company','title'].includes(v))];
+  $('#varChips').innerHTML=[...new Set(vars)].slice(0,60).map(v=>`<button class="chip" data-var="${esc(v)}">{{${esc(v)}}}</button>`).join('');
+  $('#stepList').innerHTML=c.steps.map((st,k)=>stepCard(st,k)).join('');
+}
+function stepCard(st,k){
+  return `<div class="card step" data-k="${k}"><div class="row spread"><h3>Step ${k+1}</h3>${k?`<button class="btn sm danger" data-rm="${k}">Remove</button>`:''}</div>
+    ${k?`<div class="row" style="margin:8px 0"><label class="small">Send <input type="number" data-f="delay_days" min="1" max="60" value="${st.delay_days}" style="width:70px;display:inline-block"> days after the previous step</label>
+    <label class="small"><input type="checkbox" data-f="same_thread" ${st.same_thread?'checked':''} style="width:auto"> as a reply in the same thread</label></div>`:''}
+    <label class="f" style="margin-top:8px">Subject${k?' (only used when not in the same thread)':''}<input data-f="subject" value="${esc(st.subject)}"></label>
+    <label class="f" style="margin-top:8px">Body<textarea data-f="body">${esc(st.body)}</textarea></label></div>`;
+}
+function readSteps(){return $$('#stepList [data-k]').map(card=>({delay_days:Number(card.querySelector('[data-f=delay_days]')?.value||0),same_thread:card.querySelector('[data-f=same_thread]')?.checked??false,subject:card.querySelector('[data-f=subject]').value,body:card.querySelector('[data-f=body]').value}));}
+$('#stepList').addEventListener('focusin',e=>{if(e.target.matches('[data-f=subject],[data-f=body]'))C.lastField=e.target;});
+$('#stepList').addEventListener('click',e=>{const rm=e.target.closest('[data-rm]');if(!rm)return;C.cur.steps=readSteps().filter((_,k)=>k!=rm.dataset.rm);renderSteps();});
+$('#varChips').addEventListener('click',e=>{const b=e.target.closest('[data-var]');if(!b)return;const t=`{{${b.dataset.var}}}`,f=C.lastField;
+  if(f&&document.body.contains(f)){const a=f.selectionStart??f.value.length;f.value=f.value.slice(0,a)+t+f.value.slice(f.selectionEnd??a);f.focus();f.selectionStart=f.selectionEnd=a+t.length;}else{navigator.clipboard?.writeText(t);toast('Copied '+t);}});
+$('#addStepBtn').onclick=()=>{const steps=readSteps();if(steps.length>=8)return toast('Up to 8 steps');steps.push({delay_days:3,same_thread:true,subject:'',body:'Hi {{first_name}},\n\n'});C.cur.steps=steps;renderSteps();};
+$('#saveSeqBtn').onclick=async()=>{try{await api('/api/campaigns/'+C.cur.id,{method:'PUT',body:{steps:readSteps()}});toast('Sequence saved');openCampaign(C.cur.id,true);}catch(e){toast(e.message);}};
+$('#previewBtn').onclick=async()=>{const r=await api(`/api/campaigns/${C.cur.id}/leads?limit=1`).catch(()=>({rows:[]}));if(!r.rows.length)return toast('Add a lead first to preview with real data');
+  await api('/api/campaigns/'+C.cur.id,{method:'PUT',body:{steps:readSteps()}}).catch(e=>toast(e.message));openLead(r.rows[0].id);};
+
+// Schedule
+function renderSchedule(){
+  const c=C.cur,f=$('#schedForm');
+  $('#schedInboxes').innerHTML=C.list.eligibility.length?C.list.eligibility.map(i=>`<label class="toggle"><input type="checkbox" name="sender" value="${i.id}" ${c.sender_ids.includes(i.id)?'checked':''}><span>${esc(i.email)} ${i.ok?'<span class="pill good">Ready</span>':`<span class="pill warn">Not yet</span> <span class="muted small">${esc(i.reason)}</span>`}</span></label>`).join(''):'<p class="muted">No sender inboxes yet.</p>';
+  for(const k of ['start_hour','end_hour','daily_limit','gap_min','gap_max','signature','opt_out_line'])f[k].value=c[k]??'';
+  for(const k of ['review','stop_on_reply','track_clicks','track_opens'])f[k].checked=!!c[k];
+  $('#dayBoxes').innerHTML=DAYS.map(([d,l])=>`<label class="small"><input type="checkbox" name="day" value="${d}" ${String(c.days).includes(d)?'checked':''}> ${l}</label>`).join('');
+}
+$('#schedForm').onsubmit=async e=>{e.preventDefault();const f=e.target;
+  const body={sender_ids:$$('#schedForm [name=sender]:checked').map(x=>Number(x.value)),days:$$('#schedForm [name=day]:checked').map(x=>x.value).join('')};
+  for(const k of ['start_hour','end_hour','daily_limit','gap_min','gap_max'])body[k]=Number(f[k].value);
+  for(const k of ['signature','opt_out_line'])body[k]=f[k].value;
+  for(const k of ['review','stop_on_reply','track_clicks','track_opens'])body[k]=f[k].checked;
+  if(body.track_opens&&!C.cur.track_opens&&!confirm('Open tracking hurts deliverability on new domains. Turn it on anyway?'))return;
+  try{await api('/api/campaigns/'+C.cur.id,{method:'PUT',body});toast('Schedule saved');openCampaign(C.cur.id,true);}catch(err){toast(err.message);}};
+
+// Add leads
+function renderAdd(){const c=C.cur;$('#ingestUrl').value=c.ingestUrl;
+  $('#ingestNote').textContent=c.ingestUrl.startsWith('http')?'Anyone with this link can add leads to this campaign, so keep it private. "New link" turns the old one off.':'Sign in through your Railway address once so the full link appears here.';}
+$('#copyIngest').onclick=()=>{navigator.clipboard?.writeText($('#ingestUrl').value);toast('Copied');};
+$('#rotateIngest').onclick=async()=>{if(!confirm('Make a new link? The old one stops working, so update it in PitchPersona.'))return;await api(`/api/campaigns/${C.cur.id}/rotate-token`,{method:'POST'});openCampaign(C.cur.id,true);};
+function parseCSV(text){const rows=[];let row=[],f='',q=false;for(let i=0;i<text.length;i++){const ch=text[i];
+  if(q){if(ch==='"'){if(text[i+1]==='"'){f+='"';i++;}else q=false;}else f+=ch;}
+  else if(ch==='"')q=true;else if(ch===','){row.push(f);f='';}else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&text[i+1]==='\n')i++;row.push(f);f='';if(row.some(v=>v.trim()))rows.push(row);row=[];}else f+=ch;}
+  row.push(f);if(row.some(v=>v.trim()))rows.push(row);return rows;}
+$('#csvFile').onchange=async e=>{const file=e.target.files[0];if(!file)return;const rows=parseCSV(await file.text());
+  if(rows.length<2){$('#csvPreview').textContent='That file has no rows.';return;}
+  const head=rows[0].map(h=>h.trim());C.csvRows=rows.slice(1).map(r=>Object.fromEntries(head.map((h,i)=>[h,r[i]??''])));
+  const hasEmail=head.some(h=>/e-?mail/i.test(h));
+  $('#csvPreview').innerHTML=`${C.csvRows.length} rows · columns: ${head.map(esc).join(', ')}${hasEmail?'':' <b style="color:var(--bad-text)">· no email column found</b>'}`;
+  $('#csvImport').disabled=!hasEmail;};
+async function importRows(rows,source){
+  let added=0,skipped=[];for(let i=0;i<rows.length;i+=1000){const r=await api(`/api/campaigns/${C.cur.id}/leads`,{method:'POST',body:{leads:rows.slice(i,i+1000),source}});added+=r.added;skipped=skipped.concat(r.skipped);}
+  $('#importOut').innerHTML=`<div class="banner ${added?'good':'warn'}"><b>${added} added</b>${skipped.length?`, ${skipped.length} skipped<ul>${skipped.slice(0,20).map(s=>`<li>${esc(s.email)}: ${esc(s.reason)}</li>`).join('')}${skipped.length>20?`<li>and ${skipped.length-20} more</li>`:''}</ul>`:''}${added&&C.cur.review?'<div class="small">They are waiting in Review.</div>':''}</div>`;
+  const id=C.cur.id;await openCampaign(id,true);}
+$('#csvImport').onclick=async()=>{if(!C.csvRows)return;$('#csvImport').disabled=true;try{await importRows(C.csvRows,'a CSV');$('#csvFile').value='';C.csvRows=null;}catch(e){toast(e.message);$('#csvImport').disabled=false;}};
+$('#pasteImport').onclick=async()=>{const rows=$('#pasteLeads').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const [email,first_name,...company]=l.split(/[,;\t]/).map(x=>x.trim());return{email,first_name,company:company.join(' ')};});
+  if(!rows.length)return;try{await importRows(rows,'a paste');$('#pasteLeads').value='';}catch(e){toast(e.message);}};
+
+// Replies
+let REPLIES=[];
+async function loadReplies(){REPLIES=await api('/api/replies').catch(()=>[]);renderReplies();}
+function renderReplies(){const k=$('#replyFilter').value,list=REPLIES.filter(r=>!k||r.kind===k);
+  const lab={reply:['good','Reply'],auto:['','Auto-reply'],bounce:['bad','Bounced'],unsubscribe:['warn','Asked to stop']};
+  $('#replyList').innerHTML=list.length?list.map(r=>`<div class="mail" data-rl="${r.lead_id}" style="${r.read?'':'border-left:3px solid var(--accent);padding-left:10px'}"><div class="row spread"><div><b>${esc(r.lead_name||r.from_email)}</b> <span class="muted small">${esc(r.from_email)}${r.company?' · '+esc(r.company):''}</span>
+    <div class="small">${esc(r.subject)}</div><div class="muted small">${esc(r.snippet)}</div><div class="muted small">${esc(r.campaign_name||'')} · to ${esc(r.inbox)} · ${fmtTime(r.received_at)}</div></div><span class="pill ${lab[r.kind][0]}">${lab[r.kind][1]}</span></div></div>`).join(''):'<p class="muted">No replies yet.</p>';}
+$('#replyFilter').onchange=renderReplies;
+$('#replyList').addEventListener('click',e=>{const r=e.target.closest('[data-rl]');if(r&&r.dataset.rl!=='null')openLead(Number(r.dataset.rl));});
+$('#markRead').onclick=async()=>{await api('/api/replies/read',{method:'POST'});loadReplies();badge();};
+async function badge(){const r=await api('/api/replies').catch(()=>[]);REPLIES=r;const n=r.filter(x=>!x.read&&x.kind==='reply').length;const b=$('#replyBadge');b.textContent=n;b.classList.toggle('hidden',!n);}
+setInterval(()=>{if(!$('#app').classList.contains('hidden')&&!document.hidden)badge();},60000);setTimeout(badge,1500);
+
+// Do-not-email list
+async function loadSuppression(){const l=await api('/api/suppression').catch(()=>[]);
+  $('#supList').innerHTML=l.length?`<table>${l.map(x=>`<tr><td>${esc(x.email)}</td><td class="muted">${esc(x.reason)}</td><td class="muted hide-sm">${fmtTime(x.at)}</td><td><button type="button" class="btn sm" data-unsup="${esc(x.email)}">Remove</button></td></tr>`).join('')}</table>`:'<p class="muted">Empty.</p>';}
+$('#supAddBtn').onclick=async()=>{const v=$('#supAdd').value.trim();if(!v)return;try{const r=await api('/api/suppression',{method:'POST',body:{emails:v}});toast(`${r.added} added`);$('#supAdd').value='';loadSuppression();}catch(e){toast(e.message);}};
+$('#supList').addEventListener('click',async e=>{const b=e.target.closest('[data-unsup]');if(!b)return;if(!confirm(`Allow emailing ${b.dataset.unsup} again?`))return;await api('/api/suppression/'+encodeURIComponent(b.dataset.unsup),{method:'DELETE'});loadSuppression();});
+</script>
+
 </body>
 </html>

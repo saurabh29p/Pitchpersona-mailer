@@ -1,18 +1,22 @@
 {
-  "name": "pitchpersona-warmup",
+  "name": "pitchpersona-mailer",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.1.0",
   "type": "module",
-  "description": "Small self-hosted inbox warm-up with a browser control panel.",
+  "description": "Internal self-hosted inbox warm-up and cold-email sender with a browser control panel.",
   "engines": {
     "node": ">=22.5"
   },
   "scripts": {
     "start": "node --experimental-sqlite --no-warnings src/index.mjs",
-    "dry": "DRY_RUN=1 node --experimental-sqlite --no-warnings src/index.mjs --once"
+    "dry": "DRY_RUN=1 node --experimental-sqlite --no-warnings src/index.mjs --once",
+    "test": "node --experimental-sqlite --no-warnings test/run.mjs"
   },
   "dependencies": {
     "imapflow": "^1.7.8",
     "nodemailer": "^6.10.1"
+  },
+  "devDependencies": {
+    "smtp-server": "^3.19.17"
   }
 }
