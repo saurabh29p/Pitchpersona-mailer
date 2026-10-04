@@ -12,8 +12,8 @@ export const freePort = () => new Promise((resolve) => {
   const s = net.createServer().listen(0, "127.0.0.1", () => { const p = s.address().port; s.close(() => resolve(p)); });
 });
 
-export async function startEngine(env = {}) {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "mailer-test-"));
+// Pass an existing dataDir to restart on the same database.
+export async function startEngine(env = {}, { dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "mailer-test-")) } = {}) {
   const port = await freePort();
   const child = spawn(process.execPath, ["--experimental-sqlite", "--no-warnings", "src/index.mjs"], {
     cwd: ROOT, env: { ...process.env, DATA_DIR: dataDir, PORT: String(port), ...env }, stdio: ["ignore", "pipe", "pipe"],
@@ -27,8 +27,10 @@ export async function startEngine(env = {}) {
     await sleep(100);
   }
   return {
-    url, port, dataDir, dbPath: path.join(dataDir, "warmup.db"), log: () => log,
-    stop: () => { child.kill(); fs.rmSync(dataDir, { recursive: true, force: true }); },
+    url, port, dataDir, child, dbPath: path.join(dataDir, "warmup.db"), log: () => log,
+    stop: ({ keep = false } = {}) => { child.kill(); if (!keep) fs.rmSync(dataDir, { recursive: true, force: true }); },
+    // Stops the process and waits for it to exit, keeping the data folder.
+    exit: () => new Promise((resolve) => { if (child.exitCode !== null) return resolve(child.exitCode); child.once("exit", (code) => resolve(code)); child.kill(); }),
   };
 }
 

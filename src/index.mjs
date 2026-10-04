@@ -56,7 +56,13 @@ CREATE TABLE IF NOT EXISTS events (at TEXT, level TEXT, inbox TEXT, message TEXT
 CREATE TABLE IF NOT EXISTS dns_checks (domain TEXT PRIMARY KEY, result TEXT, checked_at TEXT);
 CREATE TABLE IF NOT EXISTS dkim_seen (domain TEXT PRIMARY KEY, result TEXT, via TEXT, at TEXT);
 CREATE INDEX IF NOT EXISTS sent_sender_day ON sent(sender, day);
+CREATE INDEX IF NOT EXISTS sent_day ON sent(day);
+CREATE INDEX IF NOT EXISTS sent_time ON sent(sent_at);
+CREATE INDEX IF NOT EXISTS seen_day ON seen(day);
+CREATE INDEX IF NOT EXISTS seen_recipient_day ON seen(recipient, day);
+CREATE INDEX IF NOT EXISTS reply_queue_due ON reply_queue(done, due_at);
 CREATE INDEX IF NOT EXISTS events_at ON events(at);
+CREATE INDEX IF NOT EXISTS events_inbox ON events(inbox, level, at);
 `);
 // The last Test login result: 1 passed, 0 failed, NULL not tested since the password was saved.
 for (const col of ["login_ok INTEGER", "login_at TEXT"]) { try { db.exec(`ALTER TABLE inboxes ADD COLUMN ${col}`); } catch { /* already there */ } }
@@ -198,6 +204,7 @@ function saveInbox(input, id) {
     paused: input.paused === undefined ? cur?.paused ?? 0 : input.paused ? 1 : 0,
   };
   if (!row.smtp_host || !row.imap_host) throw new Error("SMTP and IMAP hosts are required for a custom provider");
+  if (![row.smtp_port, row.imap_port].every((n) => Number.isInteger(n) && n > 0 && n < 65536)) throw new Error("Ports must be whole numbers, like 465 or 993");
   const password_enc = input.password ? encrypt(String(input.password).replace(/\s+/g, "")) : cur?.password_enc || "";
   if (cur && input.password) db.prepare("UPDATE inboxes SET login_ok = NULL, login_at = NULL WHERE id = ?").run(cur.id);
   if (cur && input.password && String(cur.pause_reason || "").startsWith(AUTH_PAUSE))
@@ -239,25 +246,44 @@ const dayDiff = (a, b) => Math.round((Date.parse(a + "T00:00:00Z") - Date.parse(
 const daysAgo = (n, tz) => localParts(new Date(Date.now() - n * 86400000), tz).day;
 
 // ── DNS: no sending from a domain the receivers can't authenticate ────────────────
+if (process.env.DNS_SERVERS) dns.setServers(process.env.DNS_SERVERS.split(",").map((x) => x.trim()).filter(Boolean));
+// "No such record" is an answer. A timeout or a failing DNS server is not, and must not
+// block sending, so those throw instead of reading as a missing record.
+const DNS_MISSING = new Set(["ENOTFOUND", "ENODATA"]);
 async function txt(name) {
-  try { return (await dns.resolveTxt(name)).map((r) => r.join("")); } catch { return []; }
+  try { return (await dns.resolveTxt(name)).map((r) => r.join("")); }
+  catch (e) { if (DNS_MISSING.has(e.code)) return []; throw e; }
 }
 const dnsInFlight = new Map();
+const dnsRetry = new Map();   // domain -> { at, code }: when to ask again after a lookup that got no answer
 function checkDomain(domain, force = false) {
   if (!dnsInFlight.has(domain)) dnsInFlight.set(domain, checkDomainNow(domain, force).finally(() => dnsInFlight.delete(domain)));
   return dnsInFlight.get(domain);
 }
 async function checkDomainNow(domain, force) {
   const cached = db.prepare("SELECT * FROM dns_checks WHERE domain = ?").get(domain);
-  if (!force && cached && Date.now() - Date.parse(cached.checked_at) < 6 * 3600000) return JSON.parse(cached.result);
+  const last = cached ? JSON.parse(cached.result) : null;
+  // A passing check is trusted for 6 hours. A failing one is asked again after 15 minutes,
+  // so fixed DNS starts sending on its own.
+  if (!force && last && Date.now() - Date.parse(cached.checked_at) < (last.ok ? 6 * 3600000 : 15 * 60000)) return last;
+  const retry = dnsRetry.get(domain);
+  if (!force && retry && Date.now() < retry.at) return last || dnsUnknown(domain, retry.code);
   const selectors = [...new Set(db.prepare("SELECT dkim_selector FROM inboxes WHERE email LIKE ?").all(`%@${domain}`).map((r) => r.dkim_selector || "default"))];
-  const spfRec = (await txt(domain)).find((t) => /^v=spf1/i.test(t)) || null;
-  const dmarcRec = (await txt(`_dmarc.${domain}`)).find((t) => /^v=DMARC1/i.test(t)) || null;
-  let dkimRec = null, dkimSel = null;
-  for (const s of selectors.length ? selectors : ["google"]) {
-    const r = (await txt(`${s}._domainkey.${domain}`)).find((t) => /v=DKIM1|k=rsa|p=/i.test(t));
-    if (r) { dkimRec = r; dkimSel = s; break; }
+  let spfRec, dmarcRec, dkimRec = null, dkimSel = null;
+  try {
+    spfRec = (await txt(domain)).find((t) => /^v=spf1/i.test(t)) || null;
+    dmarcRec = (await txt(`_dmarc.${domain}`)).find((t) => /^v=DMARC1/i.test(t)) || null;
+    for (const s of selectors.length ? selectors : ["google"]) {
+      const r = (await txt(`${s}._domainkey.${domain}`)).find((t) => /v=DKIM1|k=rsa|p=/i.test(t));
+      if (r) { dkimRec = r; dkimSel = s; break; }
+    }
+  } catch (e) {
+    // Keep the last real answer and ask again in a few minutes.
+    dnsRetry.set(domain, { at: Date.now() + 5 * 60000, code: e.code || e.message });
+    console.warn(`DNS lookup for ${domain} failed (${e.code || e.message}); keeping the last result`);
+    return last || dnsUnknown(domain, e.code || e.message);
   }
+  dnsRetry.delete(domain);
   const result = { domain, spf: spfRec, dkim: dkimRec ? `${dkimSel}: ${dkimRec.slice(0, 60)}...` : null, dmarc: dmarcRec,
     selectorsTried: selectors, ok: Boolean(spfRec && dkimRec && dmarcRec), checkedAt: new Date().toISOString() };
   db.prepare("INSERT INTO dns_checks VALUES (?,?,?) ON CONFLICT(domain) DO UPDATE SET result = excluded.result, checked_at = excluded.checked_at")
@@ -267,11 +293,18 @@ async function checkDomainNow(domain, force) {
       `DNS check failed: missing ${["SPF", "DKIM", "DMARC"].filter((_, i) => ![spfRec, dkimRec, dmarcRec][i]).join(", ")}. Sending from this domain is blocked.`);
   return result;
 }
+// Used only when DNS couldn't be asked and there is no earlier answer: sending waits, and the
+// panel says why instead of claiming the records are missing.
+const dnsUnknown = (domain, code) => ({ domain, spf: null, dkim: null, dmarc: null, selectorsTried: [], ok: false,
+  error: `Couldn't look up DNS for ${domain} just now (${code}). It tries again in a few minutes.`, checkedAt: null });
 
 // ── Health: placement over the last few days drives slowdown and auto-pause ───────
 function placement(email, sinceDay) {
-  const r = db.prepare(`SELECT COUNT(*) n, COALESCE(SUM(folder='inbox'),0) inbox FROM seen
-    WHERE day >= ? AND message_id IN (SELECT message_id FROM sent WHERE sender = ?)`).get(sinceDay, email);
+  // Warm-up mail is read within a few days of being sent (the reader looks back 3 days), so only
+  // this sender's sends from a week before the window need checking, not its whole history.
+  const sentSince = new Date(Date.parse(sinceDay + "T00:00:00Z") - 7 * 86400000).toISOString().slice(0, 10);
+  const r = db.prepare(`SELECT COUNT(*) n, COALESCE(SUM(v.folder='inbox'),0) inbox FROM sent s JOIN seen v ON v.message_id = s.message_id
+    WHERE s.sender = ? AND s.day >= ? AND v.day >= ?`).get(email, sentSince, sinceDay);
   return { checked: r.n, inbox: r.inbox, pct: r.n ? Math.round((100 * r.inbox) / r.n) : null };
 }
 
@@ -374,7 +407,7 @@ function transport(inbox) {
   if (!transports.has(inbox.email)) {
     transports.set(inbox.email, nodemailer.createTransport({
       host: inbox.smtp_host, port: inbox.smtp_port, secure: inbox.smtp_port === 465, requireTLS: inbox.smtp_port !== 465,
-      auth: { user: inbox.email, pass: passwordOf(inbox) }, connectionTimeout: 20000, greetingTimeout: 20000,
+      auth: { user: inbox.email, pass: passwordOf(inbox) }, connectionTimeout: 20000, greetingTimeout: 20000, socketTimeout: 60000,
     }));
   }
   return transports.get(inbox.email);
@@ -393,6 +426,7 @@ async function smtpSend(from, mail, { test = false } = {}) {
   if (!live) throw new Error("Inbox was removed");
   if (live.paused) throw Object.assign(new Error("Inbox is paused"), { code: "PAUSED" });
   if (!test && getSettings().paused) throw Object.assign(new Error("Warm-up is paused"), { code: "PAUSED" });
+  if (stopping) throw Object.assign(new Error("The mailer is restarting"), { code: "PAUSED" });
   if (DRY) return;
   try {
     await transport(from).sendMail({ from: `"${from.name}" <${from.email}>`, ...mail });
@@ -438,6 +472,7 @@ async function blockedReason(s, inbox) {
   if (!inbox.password_enc && !DRY) return "No app password saved";
   if (inbox.role === "sender" && s.requireDns && !DRY) {
     const d = await checkDomain(domainOf(inbox.email));
+    if (!d.ok && d.error) return d.error;
     if (!d.ok) return `DNS not ready: missing ${["SPF", "DKIM", "DMARC"].filter((k) => !d[k.toLowerCase()]).join(", ")}`;
   }
   return null;
@@ -467,32 +502,53 @@ async function sendPhase(s, pool, force) {
   const now = localParts(new Date(), s.timezone);
   if (!DRY && !force && !inWindow(s, now)) return;
   const ticksLeft = Math.max(1, Math.ceil(((s.endHour - now.hour) * 60 - now.minute) / s.tickMinutes));
-  for (const from of pool.filter((i) => i.role === "sender")) {
-    if (await blockedReason(s, from)) continue;
-    if (!healthGuard(from, s)) continue;
+  // A few inboxes at a time: each one is its own mailbox, and a slow AI answer for one
+  // shouldn't hold up the rest.
+  await eachLimit(pool.filter((i) => i.role === "sender"), 4, async (from) => {
+    if (await blockedReason(s, from)) return;
+    if (!healthGuard(from, s)) return;
     const { target } = dailyTarget(from, s);
     const remaining = target - sentToday(from.email, now.day);
-    if (remaining <= 0) continue;
-    if (!DRY && !force && Math.random() > Math.min(1, remaining / ticksLeft)) continue;  // spread sends over the day
+    if (remaining <= 0) return;
+    if (!DRY && !force && Math.random() > Math.min(1, remaining / ticksLeft)) return;  // spread sends over the day
     const to = chooseRecipient(s, from, pool);
-    if (!to) continue;
+    if (!to) return;
     try {
       const email = await writeEmail(s, { from, to, topic: pickOne(s.topics) });
       await send(s, { from, to, ...email, depth: 0 });
     } catch (e) { if (e.code !== "PAUSED") event("error", from.email, `Send failed: ${String(e.message).slice(0, 250)}`); }
-  }
+  });
+}
+
+// Runs fn over items with at most `limit` running at once.
+async function eachLimit(items, limit, fn) {
+  const queue = [...items];
+  await Promise.all(Array.from({ length: Math.min(limit, queue.length) }, async () => { while (queue.length) await fn(queue.shift()); }));
 }
 
 // ── Reading: rescue from spam, engage, queue replies ───────────────────────────
-async function withImap(inbox, fn) {
+// Every mailbox visit has a deadline. A mail server that stops answering mid-command would
+// otherwise hold up the cycle, and with it every other inbox, until the process restarts.
+async function withImap(inbox, fn, deadlineMs = IMAP_DEADLINE_MS) {
   const client = new ImapFlow({ host: inbox.imap_host, port: inbox.imap_port || 993, secure: true,
     auth: { user: inbox.email, pass: passwordOf(inbox) }, logger: false,
     connectionTimeout: 20000, greetingTimeout: 15000, socketTimeout: 120000 });
   // Without a listener, a socket error would be an uncaught 'error' event and kill the process.
   client.on("error", (e) => event("error", inbox.email, `Mail server connection error: ${String(e?.message || e).slice(0, 200)}`));
-  await client.connect();
-  try { return await fn(client); } finally { await client.logout().catch(() => {}); }
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; client.close(); }, deadlineMs);
+  try {
+    await client.connect();
+    return await fn(client);
+  } catch (e) {
+    if (timedOut) throw new Error(`the mail server didn't finish within ${Math.round(deadlineMs / 1000)} seconds, so this cycle skipped it`);
+    throw e;
+  } finally {
+    if (!timedOut) await client.logout().catch(() => {});
+    clearTimeout(timer);
+  }
 }
+const IMAP_DEADLINE_MS = Number(process.env.IMAP_DEADLINE_MS) || 5 * 60000;
 
 // Reads one inbox. Returns true when the campaign reply scan covered every folder, which
 // is what allows this inbox to send campaign emails in the same cycle.
@@ -514,7 +570,7 @@ async function readInbox(s, inbox, pool) {
       const lock = await client.getMailboxLock(folder);
       try {
         if (job.scan && inbox.role === "sender") {
-          try { await camp.scanFolder(client, inbox, folder, folder === junk); }
+          try { if (!(await camp.scanFolder(client, inbox, folder, folder === junk))) scanOk = false; }
           catch (e) { scanOk = false; event("error", inbox.email, `Reply scan of ${folder} failed: ${String(e.message).slice(0, 200)}`); }
         }
         if (!job.warm || !poolAddrs.length) continue;
@@ -559,12 +615,12 @@ async function readPhase(s, pool) {
   // An inbox whose password was rejected isn't retried until a new one is saved: repeated
   // failed logins can get the account locked.
   const readable = pool.filter((i) => i.password_enc && !(i.paused && String(i.pause_reason || "").startsWith(AUTH_PAUSE)));
-  await Promise.all(readable.map((inbox) =>
+  await eachLimit(readable, 8, (inbox) =>
     readInbox(s, inbox, pool).then((ok) => { if (ok) scanned.add(inbox.id); }).catch((e) => {
       // A rejected login won't fix itself; stop retrying a bad password every few minutes.
       if (isAuthError(e)) { pauseInbox(inbox, `${AUTH_PAUSE}. Save a new one, then resume.`); db.prepare("UPDATE inboxes SET login_ok = 0, login_at = ? WHERE id = ?").run(new Date().toISOString(), inbox.id); }
       else event("error", inbox.email, `Reading the inbox failed: ${imapError(e)}`);
-    })));
+    }));
   return scanned;
 }
 
@@ -595,9 +651,11 @@ async function replyPhase(s, force) {
 
 // ── Scheduler ───────────────────────────────────────────────────────────────────
 const state = { running: false, lastTickAt: null, nextTickAt: null, timer: null };
+let stopping = false;
 async function tick({ force = false } = {}) {
-  if (state.running) return false;
+  if (state.running || stopping) return false;
   const s = getSettings();
+  housekeeping();
   if (s.paused && !DRY) return false;
   state.running = true;
   try {
@@ -605,12 +663,25 @@ async function tick({ force = false } = {}) {
     await replyPhase(s, force);
     await sendPhase(s, listInboxes(), force);
     await camp.sendPhase(getSettings(), listInboxes(), scanned);
-    db.prepare("DELETE FROM events WHERE at < ?").run(new Date(Date.now() - 30 * 86400000).toISOString());
   } finally { state.running = false; state.lastTickAt = new Date().toISOString(); }
   return true;
 }
+
+// Once an hour: drop old activity and finished reply jobs, and keep the query planner's statistics fresh.
+let lastHousekeeping = 0;
+function housekeeping() {
+  if (Date.now() - lastHousekeeping < 3600000) return;
+  lastHousekeeping = Date.now();
+  try {
+    db.prepare("DELETE FROM events WHERE at < ?").run(new Date(Date.now() - 30 * 86400000).toISOString());
+    db.prepare("DELETE FROM reply_queue WHERE done = 1 AND due_at < ?").run(new Date(Date.now() - 14 * 86400000).toISOString());
+    camp.housekeeping();
+    db.exec("PRAGMA optimize");
+  } catch (e) { event("error", null, `Housekeeping failed: ${String(e.message).slice(0, 200)}`); }
+}
 function schedule() {
   clearTimeout(state.timer);
+  if (stopping) return;
   const ms = getSettings().tickMinutes * 60000;
   state.nextTickAt = new Date(Date.now() + ms).toISOString();
   state.timer = setTimeout(async () => { try { await tick(); } catch (e) { event("error", null, `Cycle failed: ${e.message}`); } schedule(); }, ms);
@@ -703,6 +774,7 @@ function readJson(req) {
     let size = 0; const chunks = [];
     req.on("data", (c) => { size += c.length; if (size > 200000) { reject(new Error("Body too large")); req.destroy(); } else chunks.push(c); });
     req.on("end", () => { try { resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString("utf8")) : {}); } catch { reject(new Error("Invalid JSON")); } });
+    req.on("error", reject);
   });
 }
 
@@ -712,7 +784,7 @@ const imapError = (e) => (isAuthError(e) ? "the password was rejected" : String(
 async function testInbox(i) {
   const out = { smtp: null, imap: null };
   try { transports.delete(i.email); await transport(i).verify(); out.smtp = "ok"; } catch (e) { out.smtp = String(e.message).slice(0, 200); }
-  try { await withImap(i, async (c) => { await c.list(); }); out.imap = "ok"; } catch (e) { out.imap = imapError(e); }
+  try { await withImap(i, async (c) => { await c.list(); }, Math.min(60000, IMAP_DEADLINE_MS)); out.imap = "ok"; } catch (e) { out.imap = imapError(e); }
   db.prepare("UPDATE inboxes SET login_ok = ?, login_at = ? WHERE id = ?").run(out.smtp === "ok" && out.imap === "ok" ? 1 : 0, new Date().toISOString(), i.id);
   event(out.smtp === "ok" && out.imap === "ok" ? "info" : "error", i.email, `Login test: SMTP ${out.smtp === "ok" ? "ok" : "failed"}, IMAP ${out.imap === "ok" ? "ok" : "failed"}`);
   return out;
@@ -740,7 +812,12 @@ async function api(req, res, url) {
   if (p === "/api/logout" && m === "POST") { res.setHeader("set-cookie", "ww=; Path=/; Max-Age=0"); return reply(200, { ok: true }); }
   if (p === "/api/state" && m === "GET") return reply(200, await overview());
   if (p === "/api/mail" && m === "GET") return reply(200, recentMail(Number(url.searchParams.get("limit") || 50), url.searchParams.get("inbox")));
-  if (p === "/api/settings" && m === "PUT") { saveSettings(await readJson(req)); schedule(); event("info", null, "Settings saved"); return reply(200, { ok: true }); }
+  if (p === "/api/settings" && m === "PUT") {
+    const before = getSettings().tickMinutes;
+    // Rescheduling on every save would push the next cycle back each time settings are saved.
+    if (saveSettings(await readJson(req)).tickMinutes !== before) schedule();
+    event("info", null, "Settings saved"); return reply(200, { ok: true });
+  }
   if (p === "/api/pause" && m === "POST") {
     const { paused } = await readJson(req);
     const why = paused ? null : startBlock();
@@ -816,13 +893,14 @@ async function api(req, res, url) {
   return reply(404, { error: "Not found" });
 }
 
+let server = null;
 function serve() {
   if (!PANEL_PASSWORD) console.warn("PANEL_PASSWORD is not set: the control panel will refuse every login until you set it.");
-  http.createServer(async (req, res) => {
+  server = http.createServer(async (req, res) => {
     res.setHeader("x-frame-options", "DENY"); res.setHeader("x-content-type-options", "nosniff"); res.setHeader("referrer-policy", "no-referrer");
     try {
       const url = new URL(req.url, "http://x");
-      if (url.pathname === "/health") return res.writeHead(200).end("ok");
+      if (url.pathname === "/health") { db.prepare("SELECT 1").get(); return res.writeHead(200).end("ok"); }
       if (await camp.publicRoute(req, res, url)) return;
       if (url.pathname.startsWith("/api/")) return await api(req, res, url);
       res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }).end(PANEL_HTML);
@@ -835,10 +913,34 @@ function serve() {
 // ── Plumbing ────────────────────────────────────────────────────────────────────
 function event(level, inbox, message) {
   console.log(new Date().toISOString(), level, inbox || "-", message);
-  db.prepare("INSERT INTO events VALUES (?,?,?,?)").run(new Date().toISOString(), level, inbox, String(message).slice(0, 500));
+  // Logging must never be what breaks a send, e.g. on a full disk.
+  try { db.prepare("INSERT INTO events VALUES (?,?,?,?)").run(new Date().toISOString(), level, inbox, String(message).slice(0, 500)); }
+  catch (e) { console.error("Couldn't record that in Activity:", e.message); }
 }
 
 process.on("unhandledRejection", (e) => event("error", null, `Unexpected error: ${String(e?.message || e).slice(0, 300)}`));
+// Anything else that escapes is recorded where the panel shows it, then the process exits and
+// Railway starts it again. Leads caught mid-send go to review on the way back up.
+process.on("uncaughtException", (e) => {
+  event("error", null, `The mailer restarted after an unexpected error: ${String(e?.stack || e).slice(0, 400)}`);
+  process.exit(1);
+});
+
+// Railway stops the old copy with SIGTERM on every deploy. Nothing new is sent from then on;
+// the step in progress gets a few seconds to finish so its result is recorded.
+async function shutdown(signal) {
+  if (stopping) return;
+  stopping = true;
+  clearTimeout(state.timer);
+  console.log(`${signal}: stopping after the current step`);
+  const until = Date.now() + 20000;
+  while (state.running && Date.now() < until) await new Promise((r) => setTimeout(r, 200));
+  server?.close();
+  try { db.close(); } catch { /* already closed */ }
+  process.exit(0);
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
 camp = createCampaigns({ db, DRY, event, getSettings, listInboxes, getInbox, blockedReason, dailyTarget, placement, localParts,
   daysAgo, smtpSend, domainOf, EMAIL_RE, readJson, first, pickOne, rand });

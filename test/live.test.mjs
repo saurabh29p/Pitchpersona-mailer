@@ -87,6 +87,7 @@ const inbox = db.prepare("SELECT paused, pause_reason FROM inboxes WHERE id=?").
 ok(inbox.paused === 1 && /refused/.test(inbox.pause_reason), "spam rejection pauses the inbox", inbox.pause_reason);
 L = Object.fromEntries(db.prepare("SELECT email, status, attempts, error FROM leads").all().map((r) => [r.email, r]));
 ok(L["spamtrap@example.com"].status === "queued" && L["spamtrap@example.com"].attempts === 1, "that lead stays queued for a retry", JSON.stringify(L["spamtrap@example.com"]));
+ok(!db.prepare("SELECT 1 FROM leads WHERE status = 'sending'").get(), "no lead is left marked as mid-send after real sends and a refusal");
 
 // The prospect replies; the paused inbox still reads it.
 const sentMid = db.prepare("SELECT message_id FROM messages WHERE recipient='ok@example.com'").get().message_id;

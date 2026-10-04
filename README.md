@@ -9,13 +9,22 @@ An internal, self-hosted replacement for Instantly or Smartlead: inbox warm-up p
 ## What protects the domains
 
 - It **starts paused**, and nothing is sent until you press Start. **Pause all** stops warm-up and campaigns at once, including emails already queued in the running cycle.
-- **DNS gate:** a domain can send only when SPF, DKIM and DMARC are all found. This is checked every 6 hours and on demand.
+- **DNS gate:** a domain can send only when SPF, DKIM and DMARC are all found. A passing domain is re-checked every 6 hours and a failing one every 15 minutes, or on demand. If DNS can't be reached at all, the last answer is kept rather than blocking sending.
 - **Hard limits** the engine enforces whatever you type: at most 50 emails per inbox per day, the ramp adds at most 5 a day, and replies max out at 60%.
 - **Slowdown:** if an inbox's placement over 3 days drops below 85%, its volume halves.
 - **Auto-pause:** an inbox pauses itself when placement drops below 70%, when the provider refuses a send (spam, rate limit or blocked), after 3 failed sends in a row, or when its password is rejected. A rejected password isn't retried until you save a new one, so the account doesn't get locked for repeated failed logins.
 - **Plain text only**, with no links, images or tracking. Links and em dashes are stripped even if the AI writes them.
 - Sends happen only in working hours, and weekends run at half volume. Each new inbox starts at day 1 of its own ramp.
 - App passwords and the AI key are encrypted (AES-256-GCM) with a key that lives on the volume.
+
+## Staying up
+
+- **Deploys and restarts:** on a deploy Railway stops the old copy with SIGTERM. The mailer stops starting new sends, lets the one in progress finish, then exits. Railway restarts it after any crash, and the reason is shown in Activity.
+- **No double emails:** a lead is marked as sending just before its email goes out. If the mailer stops at that moment, the lead waits in **Review** with a note to check the inbox's Sent folder, instead of being sent the same email again.
+- **Slow mail servers:** each mailbox visit has a 5-minute limit, so one server that stops answering can't hold up the other inboxes. At most 8 mailboxes are read and 4 warm-up emails written at once.
+- **Busy mailboxes** are read 1,000 new messages per cycle. Campaign follow-ups from that inbox wait until it has caught up, so no reply is missed.
+- **Lead batches** over 1,000 are not dropped silently: the answer says how many to send again.
+- Activity older than 30 days and finished reply jobs older than 14 days are cleared every hour.
 
 ## 1. Fix DNS first (at your DNS host, for each domain)
 
@@ -106,4 +115,4 @@ npm run dry                                       # one cycle, nothing sent
 npm test                                          # the full test suite, nothing leaves your machine
 ```
 
-`npm test` runs five files in `test/`: reply, bounce and opt-out detection against a fake mailbox; deployment guards; the start guards and setup-guide facts; an end-to-end pass in dry-run mode (sign-in, inboxes, PitchPersona webhook ingest, review, sequences and threading, pauses, inbox removal, unsubscribe and click links); and a real sending pass against local mock SMTP, IMAP and OpenRouter servers (needs `openssl`). Run it after any change before deploying.
+`npm test` runs six files in `test/`: reply, bounce and opt-out detection against a fake mailbox; deployment guards; the start guards and setup-guide facts; an end-to-end pass in dry-run mode (sign-in, inboxes, PitchPersona webhook ingest, review, sequences and threading, pauses, inbox removal, unsubscribe and click links); a real sending pass against local mock SMTP, IMAP and OpenRouter servers (needs `openssl`); and a stability pass (clean stop, restart mid-send, DNS failures, a mail server that stops answering, batched reading, lead search). Run it after any change before deploying.

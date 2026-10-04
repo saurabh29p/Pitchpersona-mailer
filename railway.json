@@ -4,7 +4,7 @@
   "deploy": {
     "startCommand": "node --experimental-sqlite --no-warnings src/index.mjs",
     "healthcheckPath": "/health",
-    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyType": "ALWAYS",
     "numReplicas": 1
   }
 }

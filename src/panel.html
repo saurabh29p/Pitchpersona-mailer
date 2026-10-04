@@ -543,7 +543,8 @@ function render(){
   if(!s.paused&&R.startBlock) probs.push(['bad',`Warm-up is switched on, but nothing is being sent. ${esc(R.startBlock)}`]);
   else if(!s.paused&&!R.readySenders&&senders.length) probs.push(['bad','Warm-up is switched on, but no inbox can send yet, so nothing is going out. The items below say why.']);
   else if(!S.inboxes.length) probs.push(['warn','Add your inboxes in the Inboxes tab to begin.']);
-  S.domains.filter(d=>!d.ok).forEach(d=>probs.push(['bad',`${esc(d.domain)} is missing ${['spf','dkim','dmarc'].filter(k=>!d[k]).map(k=>k.toUpperCase()).join(', ')}. ${s.requireDns?'Sending from it is blocked.':' <b>The DNS gate is off in Settings, so it can still send, and its mail will likely land in spam.</b>'}`]));
+  S.domains.filter(d=>!d.ok&&d.error).forEach(d=>probs.push(['warn',esc(d.error)+' Sending from it waits until then.']));
+  S.domains.filter(d=>!d.ok&&!d.error).forEach(d=>probs.push(['bad',`${esc(d.domain)} is missing ${['spf','dkim','dmarc'].filter(k=>!d[k]).map(k=>k.toUpperCase()).join(', ')}. ${s.requireDns?'Sending from it is blocked.':' <b>The DNS gate is off in Settings, so it can still send, and its mail will likely land in spam.</b>'}`]));
   S.inboxes.filter(i=>i.paused&&i.pause_reason).forEach(i=>probs.push(['bad',`${esc(i.email)} paused itself: ${esc(i.pause_reason)}`]));
   S.inboxes.filter(i=>!i.hasPassword).forEach(i=>probs.push(['warn',`${esc(i.email)} has no app password saved.`]));
   S.inboxes.filter(i=>i.hasPassword&&i.login==='failed'&&!i.paused).forEach(i=>probs.push(['bad',`${esc(i.email)} failed its last login test. Check the app password and that IMAP is on, then press Test login again.`]));
@@ -579,9 +580,9 @@ function render(){
     :`<tr><td colspan="6" class="muted">No inboxes yet.</td></tr>`);
 
   // Domains
-  $('#domains').innerHTML=S.domains.length?S.domains.map(d=>`<div class="card" style="margin:0;background:var(--surface-2)"><div class="row spread"><h3>${esc(d.domain)}</h3><span class="pill ${d.ok?'good':'bad'}">${d.ok?'Ready to send':S.settings.requireDns?'Blocked':'Not authenticated'}</span></div>
-    <dl class="kv" style="margin-top:8px">${['spf','dkim','dmarc'].map(k=>`<dt>${k.toUpperCase()}</dt><dd>${d[k]?`<span style="color:var(--good-text)">✓</span> <span class="muted">${esc(d[k].slice(0,70))}</span>`:`<span style="color:var(--bad-text)">✗ missing</span>${k==='dkim'?` <span class="muted">(tried selector ${esc((d.selectorsTried||[]).join(', ')||'google')})</span>`:''}`}</dd>`).join('')}</dl>
-    <div class="muted small" style="margin-top:6px">Checked ${fmtTime(d.checkedAt)}</div></div>`).join(''):'<p class="muted">Add a sender inbox to check its domain.</p>';
+  $('#domains').innerHTML=S.domains.length?S.domains.map(d=>`<div class="card" style="margin:0;background:var(--surface-2)"><div class="row spread"><h3>${esc(d.domain)}</h3><span class="pill ${d.ok?'good':d.error?'warn':'bad'}">${d.ok?'Ready to send':d.error?'Checking':S.settings.requireDns?'Blocked':'Not authenticated'}</span></div>
+    ${d.error?`<p class="muted small" style="margin-top:8px">${esc(d.error)}</p>`:`<dl class="kv" style="margin-top:8px">${['spf','dkim','dmarc'].map(k=>`<dt>${k.toUpperCase()}</dt><dd>${d[k]?`<span style="color:var(--good-text)">✓</span> <span class="muted">${esc(d[k].slice(0,70))}</span>`:`<span style="color:var(--bad-text)">✗ missing</span>${k==='dkim'?` <span class="muted">(tried selector ${esc((d.selectorsTried||[]).join(', ')||'google')})</span>`:''}`}</dd>`).join('')}</dl>`}
+    <div class="muted small" style="margin-top:6px">${d.checkedAt?'Checked '+fmtTime(d.checkedAt):'Not checked yet'}</div></div>`).join(''):'<p class="muted">Add a sender inbox to check its domain.</p>';
 
   renderInboxCards();
   renderEvents();
@@ -723,12 +724,12 @@ function guideSteps(){
         <div class="acts">${untested.length?`<button class="btn primary sm" data-g="testall">Test ${untested.length===1?'1 login':`${untested.length} logins`}</button>`:''}<button class="btn sm" data-goto="inboxes">Open Inboxes</button></div>`},
     {id:'dns',title:'Publish SPF, DKIM and DMARC',done:doms.length>0&&doms.every(d=>d.ok),prob:doms.some(d=>!d.ok),
       status:!doms.length?'Add a sending inbox first':`${doms.filter(d=>d.ok).length} of ${plural(doms.length,'domain')} pass`,
-      body:`<p style="margin:0">At your DNS host, add three TXT records for each sending domain:</p>
+      body:`${doms.filter(d=>d.error).map(d=>`<p class="prob">${esc(d.error)} Nothing needs changing if the records are already in place.</p>`).join('')}<p style="margin:0">At your DNS host, add three TXT records for each sending domain:</p>
         <dl class="rec"><dt>SPF</dt><dd>Host <code>@</code>, value <code>v=spf1 include:_spf.google.com ~all</code></dd>
         <dt>DKIM</dt><dd>Host <code>google._domainkey</code>, value from Google Admin (Apps, Google Workspace, Gmail, Authenticate email, Generate new record)</dd>
         <dt>DMARC</dt><dd>Host <code>_dmarc</code>, value <code>v=DMARC1; p=none; rua=mailto:you@yourdomain</code></dd></dl>
-        ${doms.filter(d=>!d.ok).map(d=>`<p class="prob">${esc(d.domain)} is missing ${['spf','dkim','dmarc'].filter(k=>!d[k]).map(k=>k.toUpperCase()).join(', ')}.</p>`).join('')}
-        <p class="note">New records can take up to an hour to show. Results are kept for 6 hours, so press Re-check DNS after a change.</p>
+        ${doms.filter(d=>!d.ok&&!d.error).map(d=>`<p class="prob">${esc(d.domain)} is missing ${['spf','dkim','dmarc'].filter(k=>!d[k]).map(k=>k.toUpperCase()).join(', ')}.</p>`).join('')}
+        <p class="note">New records can take up to an hour to show. A failing domain is checked again every 15 minutes on its own; press Re-check DNS to check now.</p>
         <div class="acts"><button class="btn primary sm" data-g="dns" ${doms.length?'':'disabled'}>Re-check DNS</button></div>`},
     {id:'dkim',title:'Turn on DKIM signing in Google',done:doms.length>0&&!unsigned.length&&(doms.every(signed)||!!s.dkimConfirmed),prob:unsigned.length>0,
       status:!doms.length?'Add a sending inbox first':unsigned.length?`Not signing with your key yet: ${unsigned.map(d=>d.domain).join(', ')}`:doms.every(signed)?'Confirmed on received warm-up mail':s.dkimConfirmed?'Marked done. It confirms itself once warm-up mail arrives':'Not confirmed yet',
@@ -820,7 +821,7 @@ const HELP={
   status:{t:'Status and the top buttons',b:()=>`<ul><li><b>Paused</b>: nothing is sent.</li><li><b>Running</b>: sending inside working hours (${S.settings.startHour}:00 to ${S.settings.endHour}:00).</li><li><b>On, but no inbox can send yet</b>: switched on, but every inbox is blocked. The banner says why.</li></ul>
     <p><b>Start warm-up</b> switches the mailer on, or says what's missing. <b>Pause all</b> stops everything, campaigns included.</p><p><b>Run a cycle now</b> does one round straight away, even outside working hours. Limits still apply.</p>`},
   placement:{t:'Inbox placement',b:()=>`<p>The share of warm-up emails that landed in the inbox rather than spam, as seen by the inbox that received them.</p><ul><li>90% or more is healthy.</li><li>Below ${S.settings.slowdownBelow}%, that inbox sends half as much.</li><li>Below ${S.settings.autoPauseBelow}%, it pauses itself.</li></ul>`},
-  dns:{t:'Domain authentication',b:`<p>SPF, DKIM and DMARC prove your mail really comes from your domain. Without all three, Gmail and Outlook send it to spam, so sending is blocked until they're found.</p><p>Results are kept for 6 hours. Press <b>Re-check DNS</b> after changing a record.</p><p>DKIM also needs <b>Start authentication</b> clicked in Google Admin.</p>`},
+  dns:{t:'Domain authentication',b:`<p>SPF, DKIM and DMARC prove your mail really comes from your domain. Without all three, Gmail and Outlook send it to spam, so sending is blocked until they're found.</p><p>A passing result is kept for 6 hours. A failing domain is checked again every 15 minutes, or press <b>Re-check DNS</b> after changing a record.</p><p>DKIM also needs <b>Start authentication</b> clicked in Google Admin.</p>`},
   roles:{t:'Senders and seeds',b:`<p><b>Sender</b>: an inbox on your sending domains. It warms up on the ramp and can later send campaigns.</p><p><b>Seed</b>: an inbox at another provider, like a personal Gmail or Outlook. It only receives and replies, which shows how outside providers treat your mail.</p><p><b>Add several</b> takes one line per inbox: <code>email, app password, name</code>.</p>`},
   inboxActions:{t:'Inbox buttons',b:`<ul><li><b>Pause / Resume</b>: stops sending from this inbox only. It still reads mail, so replies are caught.</li><li><b>Test login</b>: signs in to send and to read, without sending anything.</li><li><b>Send one now</b>: sends one real warm-up email to another of your inboxes. It counts toward today's limit.</li><li><b>Edit</b>: change the name, app password, daily cap or day 1.</li><li><b>Remove</b>: deletes the inbox. History stays, and leads it was emailing wait in Review.</li></ul>`},
   campaigns:{t:'How campaigns work',b:()=>`<ol><li><b>New campaign</b>, then add leads.</li><li>Check the sequence and preview it.</li><li>Pick inboxes and hours.</li><li><b>Send a test</b>, then <b>Start sending</b>.</li></ol><p>An inbox sends campaigns only after ${S.settings.coldMinWarmDays} warm-up days with ${S.settings.coldMinPlacement}% placement or more, and at most ${S.settings.coldDailyCap} campaign emails a day. A reply stops that person's sequence.</p>`},
@@ -978,8 +979,8 @@ load(true);
 <script>
 // ── Campaigns ──
 let C={list:null,cur:null,leadStatus:'',sub:'leads',selected:new Set(),csvRows:null,lastField:null};
-const STATUS_LABEL={review:'Review',queued:'Scheduled',replied:'Replied',bounced:'Bounced',unsubscribed:'Unsubscribed',completed:'Finished',failed:'Needs a fix',skipped:'Skipped'};
-const STATUS_CLS={review:'warn',queued:'info',replied:'good',bounced:'bad',unsubscribed:'warn',completed:'',failed:'bad',skipped:''};
+const STATUS_LABEL={review:'Review',queued:'Scheduled',sending:'Sending',replied:'Replied',bounced:'Bounced',unsubscribed:'Unsubscribed',completed:'Finished',failed:'Needs a fix',skipped:'Skipped'};
+const STATUS_CLS={review:'warn',queued:'info',sending:'info',replied:'good',bounced:'bad',unsubscribed:'warn',completed:'',failed:'bad',skipped:''};
 const DAYS=[['1','Mon'],['2','Tue'],['3','Wed'],['4','Thu'],['5','Fri'],['6','Sat'],['7','Sun']];
 
 async function loadCampaigns(){

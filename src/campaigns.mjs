@@ -55,6 +55,15 @@ export function createCampaigns(ctx) {
   `);
 
   try { db.exec("ALTER TABLE leads ADD COLUMN attempts INTEGER DEFAULT 0"); } catch { /* already there */ }
+  db.exec(`
+  CREATE INDEX IF NOT EXISTS messages_campaign_day ON messages(campaign_id, day);
+  CREATE INDEX IF NOT EXISTS messages_campaign_lead ON messages(campaign_id, lead_id, opens, clicks);
+  CREATE INDEX IF NOT EXISTS messages_lead ON messages(lead_id);
+  CREATE INDEX IF NOT EXISTS messages_sender_time ON messages(sender, sent_at);
+  CREATE INDEX IF NOT EXISTS replies_lead ON replies(lead_id);
+  CREATE INDEX IF NOT EXISTS replies_campaign ON replies(campaign_id, kind);
+  CREATE INDEX IF NOT EXISTS replies_inbox ON replies(inbox, kind, received_at);
+  `);
 
   const now = () => new Date().toISOString();
   const token = () => crypto.randomBytes(18).toString("base64url");
@@ -158,8 +167,24 @@ export function createCampaigns(ctx) {
     db.exec("COMMIT");
     } catch (e) { db.exec("ROLLBACK"); throw e; }
     if (added.length) event("info", null, `${added.length} lead${added.length > 1 ? "s" : ""} added to "${campaign.name}" from ${source}${campaign.review ? " (waiting for review)" : ""}`);
-    return { added: added.length, skipped };
+    // Never drop rows silently: say how many were left out so they can be sent again.
+    const notRead = Math.max(0, rows.length - MAX_INGEST);
+    return { added: added.length, skipped, ...(notRead ? { notRead, note: `Only the first ${MAX_INGEST} leads are read per batch. Send the other ${notRead} in another batch.` } : {}) };
   }
+
+  // A lead still marked 'sending' was interrupted: the email may or may not have gone out.
+  // It waits in review rather than risk sending the same email twice.
+  function recoverInterrupted(olderThanMs) {
+    const rows = db.prepare("SELECT id, error FROM leads WHERE status = 'sending' AND updated_at < ?").all(new Date(Date.now() - olderThanMs).toISOString());
+    for (const l of rows) {
+      const what = String(l.error || "").replace(/^Sending /, "") || "its next step";
+      db.prepare("UPDATE leads SET status='review', next_at=COALESCE(next_at, ?), error=?, updated_at=? WHERE id=?")
+        .run(now(), `The mailer stopped while sending ${what}. If that email is in the inbox's Sent folder, press Skip; if not, Approve to send it.`, now(), l.id);
+    }
+    if (rows.length) event("warn", null, `${rows.length} lead${rows.length > 1 ? "s" : ""} moved to review: the mailer stopped while emailing ${rows.length > 1 ? "them" : "it"}. Check the Sent folder before approving.`);
+  }
+  recoverInterrupted(-1000);   // at start-up nothing is sending, so every such lead was interrupted
+  const housekeeping = () => recoverInterrupted(15 * 60000);
 
   // ── Cold eligibility: the warm-up has to have earned it ──────────────────────
   async function coldStatus(s, inbox) {
@@ -226,7 +251,10 @@ export function createCampaigns(ctx) {
     if (linkBase(s)) { headers["List-Unsubscribe"] = `<${linkBase(s)}/u/${lead.token}>, <mailto:${sender.email}?subject=unsubscribe>`; headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"; }
     else headers["List-Unsubscribe"] = `<mailto:${sender.email}?subject=unsubscribe>`;
     const threadRefs = mail.threaded && lead.last_message_id ? { inReplyTo: lead.last_message_id, references: [lead.thread_id, lead.last_message_id].filter((v, i, a) => v && a.indexOf(v) === i) } : {};
-    await smtpSend(sender, { to: { name: lead.name || "", address: lead.email }, subject: mail.subject, messageId, headers, ...bodies, ...threadRefs });
+    // Marked first, so a restart in the middle of a send can't lead to the same email twice.
+    db.prepare("UPDATE leads SET status='sending', error=?, updated_at=? WHERE id=?").run(`Sending step ${step.n} from ${sender.email}`, now(), lead.id);
+    try { await smtpSend(sender, { to: { name: lead.name || "", address: lead.email }, subject: mail.subject, messageId, headers, ...bodies, ...threadRefs }); }
+    catch (e) { db.prepare("UPDATE leads SET status='queued', error=NULL WHERE id=? AND status='sending'").run(lead.id); throw e; }
     db.prepare("INSERT INTO messages (lead_id, campaign_id, step, sender, recipient, message_id, subject, body, sent_at, day, token) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
       .run(lead.id, campaign.id, step.n, sender.email, lead.email, messageId, mail.subject, mail.text, now(), localParts(new Date(), s.timezone).day, msgToken);
     advance(messageId, mail.threaded ? null : mail.subject);
@@ -332,6 +360,8 @@ export function createCampaigns(ctx) {
 
   // Reads messages that arrived since the last look (a UID cursor per folder) and records
   // replies, auto-replies, opt-outs and bounces for leads this inbox has emailed.
+  // Returns false while there is still unread mail left for the next cycle.
+  const SCAN_BATCH = Number(process.env.SCAN_BATCH) || 1000;
   async function scanFolder(client, inbox, folder, isSpam) {
     const mb = client.mailbox;
     const cur = db.prepare("SELECT * FROM imap_cursor WHERE inbox = ? AND folder = ?").get(inbox.email, folder);
@@ -340,13 +370,16 @@ export function createCampaigns(ctx) {
       // First look at this folder (or it was rebuilt): start from now, don't replay history.
       db.prepare("INSERT INTO imap_cursor VALUES (?,?,?,?) ON CONFLICT(inbox, folder) DO UPDATE SET uidvalidity=excluded.uidvalidity, last_uid=excluded.last_uid")
         .run(inbox.email, folder, validity, Math.max(0, (mb.uidNext || 1) - 1));
-      return;
+      return true;
     }
-    if (!mb.uidNext || mb.uidNext - 1 <= cur.last_uid) return;
+    if (!mb.uidNext || mb.uidNext - 1 <= cur.last_uid) return true;
     const s = getSettings();
     const pool = new Set(listInboxes().map((i) => i.email));
+    // A busy mailbox, or one not read for a while, is worked through in batches so one cycle
+    // never loads thousands of messages at once.
+    const end = Math.min(mb.uidNext - 1, cur.last_uid + SCAN_BATCH);
     // Collect first, then act: imapflow can't run other commands inside a fetch loop.
-    const msgs = (await client.fetchAll(`${cur.last_uid + 1}:*`,
+    const msgs = (await client.fetchAll(end < mb.uidNext - 1 ? `${cur.last_uid + 1}:${end}` : `${cur.last_uid + 1}:*`,
       { uid: true, envelope: true, headers: ["auto-submitted", "x-autoreply", "in-reply-to", "references"] }, { uid: true }))
       .filter((m) => m.uid > cur.last_uid).sort((x, y) => x.uid - y.uid);
     const setCursor = (uid) => db.prepare("UPDATE imap_cursor SET last_uid = ? WHERE inbox = ? AND folder = ? AND last_uid < ?").run(uid, inbox.email, folder, uid);
@@ -354,6 +387,8 @@ export function createCampaigns(ctx) {
       await handleMessage(client, inbox, folder, isSpam, msg, s, pool);
       setCursor(msg.uid);      // per message, so a failure halfway never re-handles or skips one
     }
+    if (end < mb.uidNext - 1) { setCursor(end); return false; }   // UIDs can have gaps; carry on after this batch next cycle
+    return true;
   }
 
   async function handleMessage(client, inbox, folder, isSpam, msg, s, pool) {
@@ -362,7 +397,8 @@ export function createCampaigns(ctx) {
     if (!fromAddr || pool.has(fromAddr)) return;
     const subject = msg.envelope?.subject || "";
     const mid = msg.envelope?.messageId || `${inbox.email}:${folder}:${msg.uid}`;
-    if (db.prepare("SELECT 1 FROM replies WHERE message_id = ? OR message_id LIKE ?").get(mid, `${mid}:%`)) return;
+    // Bounces are stored as "<message id>:<address>"; ":" sorts right before ";", so this range finds them by index.
+    if (db.prepare("SELECT 1 FROM replies WHERE message_id = ? OR (message_id > ? AND message_id < ?)").get(mid, `${mid}:`, `${mid};`)) return;
     const download = async () => {
       const dl = await client.download(String(msg.uid), undefined, { uid: true, maxBytes: 65536 });
       return dl ? streamToBuffer(dl.content) : Buffer.alloc(0);
@@ -616,13 +652,14 @@ export function createCampaigns(ctx) {
     if (sub === "/rotate-token" && m === "POST") { db.prepare("UPDATE campaigns SET ingest_token = ? WHERE id = ?").run(token(), c.id); reply(200, { ok: true }); return true; }
     if (sub === "/leads" && m === "GET") {
       const st = url.searchParams.get("status"), q = (url.searchParams.get("q") || "").toLowerCase();
-      const limit = Math.min(500, Number(url.searchParams.get("limit") || 200)), offset = Number(url.searchParams.get("offset") || 0);
-      const where = ["campaign_id = ?"], args = [c.id];
-      if (st && LEAD_STATUSES.includes(st)) { where.push("status = ?"); args.push(st); }
-      if (q) { where.push("(email LIKE ? OR name LIKE ? OR company LIKE ?)"); args.push(`%${q}%`, `%${q}%`, `%${q}%`); }
+      const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit")) || 200)), offset = Math.max(0, Number(url.searchParams.get("offset")) || 0);
+      const where = ["l.campaign_id = ?"], args = [c.id];
+      if (st && LEAD_STATUSES.includes(st)) { where.push("l.status = ?"); args.push(st); }
+      // Columns are named with "l." because inboxes, joined below for the sender, has email and name too.
+      if (q) { where.push("(l.email LIKE ? OR l.name LIKE ? OR l.company LIKE ?)"); args.push(`%${q}%`, `%${q}%`, `%${q}%`); }
       const rows = db.prepare(`SELECT l.id, l.email, l.name, l.company, l.title, l.status, l.step, l.next_at, l.error, l.updated_at, i.email sender
         FROM leads l LEFT JOIN inboxes i ON i.id = l.sender_id WHERE ${where.join(" AND ")} ORDER BY l.id DESC LIMIT ? OFFSET ?`).all(...args, limit, offset);
-      const total = db.prepare(`SELECT COUNT(*) c FROM leads WHERE ${where.join(" AND ")}`).get(...args).c;
+      const total = db.prepare(`SELECT COUNT(*) c FROM leads l WHERE ${where.join(" AND ")}`).get(...args).c;
       reply(200, { rows, total }); return true;
     }
     if (sub === "/leads" && m === "POST") {
@@ -721,5 +758,5 @@ export function createCampaigns(ctx) {
     });
   }
 
-  return { sendPhase, scanFolder, api, publicRoute, coldStatus, compose, render, normalizeLead, inboxRemoved };
+  return { sendPhase, scanFolder, api, publicRoute, coldStatus, compose, render, normalizeLead, inboxRemoved, housekeeping };
 }
