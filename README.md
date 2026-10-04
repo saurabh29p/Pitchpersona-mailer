@@ -19,7 +19,7 @@ An internal, self-hosted replacement for Instantly or Smartlead: inbox warm-up p
 
 ## 1. Fix DNS first (at your DNS host, for each domain)
 
-As of 4 Oct 2026, both domains have Google MX records but **no SPF, no DKIM and no DMARC**. The panel will show them as blocked until these exist.
+getpitchpersona.com and trypitchpersona.com passed all three checks on 4 Oct 2026. For any new sending domain, add these records first. The panel shows the domain as blocked until they exist.
 
 | Type | Name | Value |
 |---|---|---|
@@ -32,13 +32,21 @@ Also give every inbox a profile photo and a plain signature, and add both domain
 
 ## 2. Deploy on Railway
 
-1. In Railway, create a **New Project**, choose **Deploy from GitHub repo**, and pick `pitchpersona-backend`. Under **Settings**, then **Source**, set **Root Directory** to `mailer` and the branch to the one this lives on.
-   Then, under **Settings**, then **Config-as-code**, set **Railway Config File** to `/mailer/railway.json`. Railway doesn't apply the Root Directory to this path, so without it the service uses the PitchPersona API's `/railway.toml` and fails with "The executable `python` could not be found". If a **Custom Start Command** is set under **Deploy**, clear it.
+1. In Railway, create a **New Project**, choose **Deploy from GitHub repo**, and pick `pitchpersona-mailer` on the `main` branch. Leave **Root Directory** empty. Railway reads `railway.json` from the repo root.
 2. Under **Settings**, then **Volumes**, add a volume mounted at `/data`. Keep **one replica**, because the database is a single SQLite file.
 3. Under **Variables**, set `PANEL_PASSWORD` to a long random password. `OPENROUTER_API_KEY` is optional because you can paste the key in the panel instead.
 4. Under **Settings**, then **Networking**, click **Generate Domain**. Open it and sign in.
 
 Railway builds from the `Dockerfile` (Node 22) and health-checks `/health`.
+
+### Moving the existing service over from pitchpersona-backend
+
+The mailer used to live in the `mailer` folder of `pitchpersona-backend`. To point the running service at this repo without losing anything:
+
+1. Open the service, then **Settings**, then **Source**. Disconnect the old repo and connect `pitchpersona-mailer`, branch `main`.
+2. Clear **Root Directory**.
+3. Under **Config-as-code**, set **Railway Config File** to `/railway.json`, or clear it.
+4. Deploy. The volume at `/data` and the variables belong to the service, so inboxes, passwords and history stay.
 
 ## 3. Set it up in the panel
 
