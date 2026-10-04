@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Warm-up Control</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;
+  /* PitchPersona app theme (frontend src/index.css): dark by default, cream when light. */
+  --bg:#110E0B;--surface:#1A1612;--surface-2:#221C17;--line:#3A3129;--text:#F8F1E6;--text-2:#D9CCB8;--muted:#B2A48F;
+  --s1:#F2600F;--s2:#1FA89B;--good:#1FAE62;--good-text:#34D399;--warn:#F5A623;--warn-text:#FBBF24;--bad:#E5484D;--bad-text:#F87171;
+  --accent:#FF6A1A;--accent-ink:#1A0D04;--accent-text:#FF9A52;--grid:#2B241D;--ref:#9C8E79;--r:14px;
+  --grad:linear-gradient(135deg,#FF6A1A 0%,#FFB23E 100%)}
+@media (prefers-color-scheme:light){:root:where(:not([data-theme="dark"])){color-scheme:light;
+  --bg:#F6EEDF;--surface:#FFFBF3;--surface-2:#FFF7EA;--line:#E7D8C0;--text:#16120E;--text-2:#463B2F;--muted:#62554A;
+  --s1:#E0550B;--s2:#0B8F84;--good-text:#1E6640;--warn-text:#8A5610;--bad-text:#B23A30;--accent-text:#B5460A;--grid:#EFE3CF;--ref:#72655A}}
+:root[data-theme="light"]{color-scheme:light;
+  --bg:#F6EEDF;--surface:#FFFBF3;--surface-2:#FFF7EA;--line:#E7D8C0;--text:#16120E;--text-2:#463B2F;--muted:#62554A;
+  --s1:#E0550B;--s2:#0B8F84;--good-text:#1E6640;--warn-text:#8A5610;--bad-text:#B23A30;--accent-text:#B5460A;--grid:#EFE3CF;--ref:#72655A}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 "Plus Jakarta Sans",Inter,system-ui,sans-serif}
+h1,h2,.tile .val{font-family:"Space Grotesk","Plus Jakarta Sans",sans-serif;letter-spacing:-.01em}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.hrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap;max-width:1100px;margin:0 auto;padding:12px 16px}
+h1{font-size:18px;margin:0;flex:1;min-width:150px}
+h2{font-size:17px;margin:0 0 8px}h3{font-size:15px;margin:0}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 14px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--text-2)}.btn:disabled{opacity:.5;cursor:default}
+.btn.primary{background:var(--grad);color:var(--accent-ink);border-color:transparent;font-weight:600}
+.btn.primary:hover{filter:brightness(1.06)}
+.brand{width:28px;height:28px;border-radius:8px;background:var(--grad);display:inline-grid;place-items:center;color:var(--accent-ink);font-weight:800;font-size:14px;margin-right:8px;vertical-align:middle}
+.btn.danger{color:var(--bad-text)}.btn.sm{padding:5px 10px;font-size:13px}
+.big{font-weight:600;padding:9px 18px}
+nav{display:flex;gap:4px;max-width:1100px;margin:0 auto;padding:0 16px;overflow-x:auto}
+nav button{border:0;background:none;padding:10px 12px;border-bottom:2px solid transparent;cursor:pointer;color:var(--text-2);white-space:nowrap}
+nav button[aria-selected=true]{color:var(--accent-text);border-color:var(--accent);font-weight:600}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin:0 0 16px}
+.grid{display:grid;gap:16px}.g4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.tile .lab{color:var(--text-2);font-size:13px}.tile .val{font-size:30px;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.2}
+.tile .sub{color:var(--muted);font-size:13px}
+.pill{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:600;background:var(--surface-2);color:var(--text-2);white-space:nowrap}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.pill.good{color:var(--good-text)}.pill.warn{color:var(--warn-text)}.pill.bad{color:var(--bad-text)}.pill.info{color:var(--accent-text)}
+.muted{color:var(--muted)}.small{font-size:13px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle;font-variant-numeric:tabular-nums}
+th{font-size:12px;color:var(--text-2);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.scroll{overflow-x:auto}
+.meter{height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden;min-width:60px}.meter i{display:block;height:100%;background:var(--s1);border-radius:3px}
+.banner{border-radius:var(--r);padding:12px 14px;margin:0 0 16px;border:1px solid var(--line);background:var(--surface)}
+.banner.bad{border-color:var(--bad)}.banner.warn{border-color:var(--warn)}.banner.good{border-color:var(--good)}
+.banner ul{margin:6px 0 0;padding-left:20px}
+.chart{position:relative}.chart svg{width:100%;height:auto;display:block}
+.chart text{fill:var(--text-2);font-size:11px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--text-2);margin:4px 0 8px}
+.legend span{display:inline-flex;align-items:center;gap:6px}.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.tip{position:absolute;pointer-events:none;background:var(--text);color:var(--surface);font-size:12px;padding:6px 9px;border-radius:8px;white-space:nowrap;transform:translate(-50%,-110%);display:none;z-index:3}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spread{justify-content:space-between}
+.ibox{display:grid;gap:10px}
+.ibox .acts{display:flex;gap:6px;flex-wrap:wrap}
+label.f{display:grid;gap:4px;font-size:13px;color:var(--text-2)}
+label.f input,label.f select,label.f textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--text);width:100%}
+.form{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.form .full{grid-column:1/-1}
+.toggle{display:flex;gap:10px;align-items:flex-start;font-size:14px}
+.toggle input{margin-top:4px}
+.ev{display:grid;grid-template-columns:92px 1fr;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+.ev time{color:var(--muted);font-variant-numeric:tabular-nums}
+.ev b.lv{font-weight:600}
+.mail{border-bottom:1px solid var(--line);padding:8px 0;cursor:pointer}
+.mail pre{white-space:pre-wrap;font:13px/1.5 inherit;background:var(--surface-2);padding:10px;border-radius:8px;margin:8px 0 0;display:none}
+.mail.open pre{display:block}
+dialog{border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--text);padding:20px;width:min(640px,calc(100vw - 32px))}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--surface);padding:10px 16px;border-radius:10px;font-size:14px;display:none;z-index:20;max-width:calc(100vw - 32px)}
+#login{min-height:100vh;display:grid;place-items:center;padding:16px}
+#login .card{width:min(380px,100%)}
+.hidden{display:none!important}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}.kv dt{color:var(--text-2)}.kv dd{margin:0;word-break:break-all}
+.grid>.card{margin:0}.grid{margin-bottom:16px}
+@media (max-width:640px){.tile .val{font-size:24px}.hide-sm{display:none}header{position:static}.hrow{gap:8px}.hrow h1{flex-basis:100%}.big{padding:8px 14px}.tile{padding:12px}}
+</style>
+</head>
+<body>
+
+<div id="login" class="hidden">
+  <form class="card" id="loginForm">
+    <h2><span class="brand">P</span>Warm-up control panel</h2>
+    <p class="muted small">Sign in with the PANEL_PASSWORD you set in Railway.</p>
+    <label class="f">Password<input type="password" id="pw" autocomplete="current-password" required></label>
+    <p id="loginErr" class="small" style="color:var(--bad-text)"></p>
+    <button class="btn primary big" style="width:100%">Sign in</button>
+  </form>
+</div>
+
+<div id="app" class="hidden">
+<header>
+  <div class="hrow">
+    <h1><span class="brand">P</span>PitchPersona warm-up</h1>
+    <span id="statusPill" class="pill">Loading</span>
+    <button class="btn big" id="toggleBtn">Start</button>
+    <button class="btn" id="runBtn" title="Runs one cycle now, outside working hours too. Every limit still applies.">Run a cycle now</button>
+    <button class="btn sm" id="logoutBtn">Sign out</button>
+  </div>
+  <nav role="tablist">
+    <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button role="tab" data-tab="inboxes" aria-selected="false">Inboxes</button>
+    <button role="tab" data-tab="activity" aria-selected="false">Activity</button>
+    <button role="tab" data-tab="settings" aria-selected="false">Settings</button>
+    <button role="tab" data-tab="help" aria-selected="false">How it works</button>
+  </nav>
+</header>
+
+<main class="wrap">
+  <div id="banners"></div>
+
+  <!-- OVERVIEW -->
+  <section data-panel="overview">
+    <div class="grid g4" id="tiles"></div>
+    <div class="grid g2">
+      <div class="card"><h2>Emails per day</h2><div class="legend"><span><i style="background:var(--s1)"></i>New emails</span><span><i style="background:var(--s2)"></i>Replies</span></div><div class="chart" id="chVolume"></div></div>
+      <div class="card"><h2>Inbox placement per day</h2><div class="legend"><span><i style="background:var(--s1);height:3px"></i>% landing in inbox</span><span><i style="background:var(--good);height:2px"></i>90% safe line</span><span><i style="background:var(--bad);height:2px"></i>Auto-pause line</span></div><div class="chart" id="chPlacement"></div></div>
+    </div>
+    <div class="card"><div class="row spread"><h2>Inboxes today</h2><button class="btn sm" data-goto="inboxes">Manage inboxes</button></div><div class="scroll"><table id="inboxTable"></table></div></div>
+    <div class="card"><div class="row spread"><h2>Domain authentication</h2><button class="btn sm" id="dnsBtn">Re-check DNS</button></div><p class="muted small">Sending is blocked for a domain until SPF, DKIM and DMARC are all found. That's the most common way a new domain gets burned.</p><div class="grid g2" id="domains"></div></div>
+  </section>
+
+  <!-- INBOXES -->
+  <section data-panel="inboxes" class="hidden">
+    <div class="row spread" style="margin-bottom:12px"><p class="muted small" style="margin:0;flex:1;min-width:220px">Senders warm up on the ramp. Seeds are inboxes at other providers (a personal Gmail or Outlook). They only receive and reply, which shows how other providers treat your mail.</p><div class="row"><button class="btn" id="bulkBtn">Add several</button><button class="btn primary" id="addInboxBtn">Add inbox</button></div></div>
+    <div id="inboxCards" class="grid g2"></div>
+  </section>
+
+  <!-- ACTIVITY -->
+  <section data-panel="activity" class="hidden">
+    <div class="card"><div class="row spread"><h2>Recent emails</h2><select id="mailFilter" class="btn sm"><option value="">All inboxes</option></select></div><p class="muted small">Tap an email to read it. The tag shows where it landed once the receiving inbox was checked.</p><div id="mailList"></div></div>
+    <div class="card"><div class="row spread"><h2>Event log</h2><button class="btn sm" id="clearErrBtn">Clear errors</button></div><div id="events"></div></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section data-panel="settings" class="hidden">
+    <form id="settingsForm">
+      <div class="card"><h2>Schedule</h2>
+        <div class="form">
+          <label class="f">Time zone<input name="timezone" required></label>
+          <label class="f">Start hour (0-23)<input name="startHour" type="number" step="1"></label>
+          <label class="f">End hour (1-24)<input name="endHour" type="number" step="1"></label>
+          <label class="f">Check every (minutes)<input name="tickMinutes" type="number" step="1"></label>
+        </div>
+      </div>
+      <div class="card"><h2>Ramp</h2>
+        <p class="muted small">Emails each sender sends per day. Every field has a hard maximum the engine enforces, so a typo can't flood a new domain.</p>
+        <div class="form">
+          <label class="f">Day 1 emails<input name="rampStart" type="number" step="1"></label>
+          <label class="f">Add per day<input name="rampPerDay" type="number" step="1"></label>
+          <label class="f">Daily cap<input name="rampCap" type="number" step="1"></label>
+          <label class="f">Weekend volume (0-1)<input name="weekendFactor" type="number" step="0.05"></label>
+        </div>
+        <div class="legend" style="margin-top:12px"><span><i style="background:var(--s1)"></i>Planned emails per sender per day</span><span><i style="background:var(--ref);height:2px"></i>Day 15: cold email can start</span></div>
+        <div class="chart" id="chRamp"></div>
+      </div>
+      <div class="card"><h2>Behaviour</h2>
+        <div class="form">
+          <label class="f">Reply rate (0-0.6)<input name="replyRate" type="number" step="0.05"></label>
+          <label class="f">Star rate (0-0.5)<input name="starRate" type="number" step="0.05"></label>
+          <label class="f">Max replies per thread<input name="maxThreadDepth" type="number" step="1"></label>
+          <label class="f">Share sent to seeds (0-1)<input name="seedShare" type="number" step="0.05"></label>
+          <label class="f">Reply delay min (minutes)<input name="replyDelayMin" type="number" step="1"></label>
+          <label class="f">Reply delay max (minutes)<input name="replyDelayMax" type="number" step="1"></label>
+        </div>
+      </div>
+      <div class="card"><h2>Safety</h2>
+        <div class="form">
+          <label class="f">Halve volume when placement drops below (%)<input name="slowdownBelow" type="number" step="1"></label>
+          <label class="f">Pause an inbox when placement drops below (%)<input name="autoPauseBelow" type="number" step="1"></label>
+          <label class="toggle full"><input type="checkbox" name="requireDns"><span><b>Block sending until SPF, DKIM and DMARC are set</b><br><span class="muted small">Keep this on. Turning it off lets an unauthenticated domain send, which is how domains get burned.</span></span></label>
+        </div>
+      </div>
+      <div class="card"><h2>AI writer (OpenRouter)</h2>
+        <div class="form">
+          <label class="toggle full"><input type="checkbox" name="aiEnabled"><span><b>Write emails with AI</b><br><span class="muted small">When this is off or no key is saved, the engine uses built-in templates. They're free, but less varied.</span></span></label>
+          <label class="f">OpenRouter API key<input name="openrouterKey" type="password" autocomplete="off" placeholder="sk-or-..."></label>
+          <label class="f">Model<input name="aiModel" list="models"></label>
+          <datalist id="models"><option value="anthropic/claude-haiku-4.5"><option value="openai/gpt-4o-mini"><option value="google/gemini-2.0-flash-001"><option value="meta-llama/llama-3.3-70b-instruct"></datalist>
+          <div class="full row"><button type="button" class="btn" id="aiTestBtn">Write a test email</button><span id="aiKeyNote" class="muted small"></span></div>
+          <pre id="aiOut" class="full hidden" style="white-space:pre-wrap;background:var(--surface-2);padding:10px;border-radius:8px;margin:0;font-size:13px"></pre>
+        </div>
+      </div>
+      <div class="card"><h2>Topics</h2>
+        <p class="muted small">One per line. Each new email is about a random topic from this list.</p>
+        <label class="f"><textarea name="topics" rows="8"></textarea></label>
+      </div>
+      <div class="row" style="position:sticky;bottom:12px"><button class="btn primary big">Save settings</button><span id="saveNote" class="muted small"></span></div>
+    </form>
+  </section>
+
+  <!-- HELP -->
+  <section data-panel="help" class="hidden">
+    <div class="card"><h2>What it does every few minutes</h2>
+      <ol>
+        <li><b>Reads</b> every inbox and finds warm-up emails. Any it finds in spam are moved back to the inbox, and every one is marked read and important. Some get starred.</li>
+        <li><b>Replies</b> to some of them after a random, human-looking delay, so conversations form threads.</li>
+        <li><b>Sends</b> a few new plain-text emails between your inboxes, spread across working hours, following the ramp.</li>
+      </ol>
+    </div>
+    <div class="card"><h2>What protects your domains</h2>
+      <ul>
+        <li>The engine starts <b>paused</b>. Nothing is sent until you press Start.</li>
+        <li><b>DNS gate:</b> a domain sends only when SPF, DKIM and DMARC are all found.</li>
+        <li><b>Hard limits:</b> no more than 50 emails per sender per day, and the ramp adds no more than 5 per day.</li>
+        <li><b>Slowdown:</b> when a sender's inbox placement over the last 3 days falls below the slowdown line, its volume halves.</li>
+        <li><b>Auto-pause:</b> an inbox pauses if placement falls below the auto-pause line, if the provider refuses a send (spam, rate limit, blocked), or if 3 sends fail in a row.</li>
+        <li><b>Clean content:</b> plain text only, with no links, images or tracking. Links are stripped even when the AI writes one.</li>
+        <li><b>Working hours only</b>, with lower volume on weekends.</li>
+      </ul>
+    </div>
+    <div class="card"><h2>When to start cold email</h2>
+      <p>Start cold email from an inbox only after about 14 days, and only once its placement has held at 90% or more for 7 days. Begin at 10 to 15 cold emails per inbox per day and keep the warm-up running alongside. Never send cold email from these warm-up inboxes faster than the ramp they've built.</p>
+    </div>
+  </section>
+</main>
+</div>
+
+<dialog id="inboxDlg">
+  <form id="inboxForm" method="dialog">
+    <h2 id="inboxDlgTitle">Add inbox</h2>
+    <div class="form">
+      <label class="f">Email<input name="email" type="email" required></label>
+      <label class="f">Sender name<input name="name" placeholder="Saurabh Singh"></label>
+      <label class="f">Role<select name="role"><option value="sender">Sender (warms up)</option><option value="seed">Seed (receives and replies)</option></select></label>
+      <label class="f">Provider<select name="provider"><option value="google">Google Workspace / Gmail</option><option value="microsoft">Microsoft 365 / Outlook</option><option value="zoho">Zoho</option><option value="custom">Other (custom)</option></select></label>
+      <label class="f full">App password<input name="password" type="password" autocomplete="new-password" placeholder="16-character app password"><span class="muted small" id="pwHint">Google: Account, then Security, then 2-Step Verification, then App passwords.</span></label>
+      <label class="f">Warm-up day 1<input name="start_date" type="date"></label>
+      <label class="f">Own daily cap (optional)<input name="cap" type="number" min="1" max="50" placeholder="uses ramp cap"></label>
+      <details class="full"><summary class="small muted">Server settings</summary>
+        <div class="form" style="margin-top:10px">
+          <label class="f">SMTP host<input name="smtp_host"></label><label class="f">SMTP port<input name="smtp_port" type="number"></label>
+          <label class="f">IMAP host<input name="imap_host"></label><label class="f">IMAP port<input name="imap_port" type="number"></label>
+          <label class="f">DKIM selector<input name="dkim_selector"></label>
+        </div>
+      </details>
+    </div>
+    <p id="inboxErr" class="small" style="color:var(--bad-text)"></p>
+    <div class="row" style="justify-content:flex-end"><button type="button" class="btn" id="inboxCancel">Cancel</button><button class="btn primary" value="save">Save inbox</button></div>
+  </form>
+</dialog>
+
+<dialog id="bulkDlg">
+  <form id="bulkForm" method="dialog">
+    <h2>Add several inboxes</h2>
+    <p class="muted small">One inbox per line: <b>email, app password, sender name</b>. Each new inbox starts on day 1 of its own ramp, so adding inboxes later never shocks the others.</p>
+    <label class="f"><textarea name="lines" rows="7" placeholder="saurabh@getpitchpersona.com, abcd efgh ijkl mnop, Saurabh Singh&#10;hello@trypitchpersona.com, qrst uvwx yzab cdef, Saurabh Singh"></textarea></label>
+    <div class="form" style="margin-top:12px">
+      <label class="f">Provider<select name="provider"><option value="google">Google Workspace / Gmail</option><option value="microsoft">Microsoft 365 / Outlook</option><option value="zoho">Zoho</option></select></label>
+      <label class="f">Role<select name="role"><option value="sender">Sender</option><option value="seed">Seed</option></select></label>
+      <label class="f">Warm-up day 1<input name="start_date" type="date"></label>
+    </div>
+    <div id="bulkOut" class="small" style="margin-top:10px"></div>
+    <div class="row" style="justify-content:flex-end;margin-top:8px"><button type="button" class="btn" id="bulkCancel">Close</button><button class="btn primary" value="save">Add inboxes</button></div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let S=null, editing=null, tab='overview';
+
+async function api(path,opts={}){
+  const r=await fetch(path,{...opts,headers:{'content-type':'application/json'},body:opts.body?JSON.stringify(opts.body):undefined});
+  const j=await r.json().catch(()=>({}));
+  if(r.status===401&&path!=='/api/login'){showLogin();throw new Error('Signed out');}
+  if(!r.ok) throw new Error(j.error||('Error '+r.status));
+  return j;
+}
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',3500);}
+function showLogin(){$('#app').classList.add('hidden');$('#login').classList.remove('hidden');$('#pw').focus();}
+$('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginErr').textContent='';
+  try{await api('/api/login',{method:'POST',body:{password:$('#pw').value}});$('#pw').value='';await load(true);}catch(err){$('#loginErr').textContent=err.message;}};
+$('#logoutBtn').onclick=async()=>{await api('/api/logout',{method:'POST'}).catch(()=>{});showLogin();};
+
+$$('nav button').forEach(b=>b.onclick=()=>go(b.dataset.tab));
+function go(t){tab=t;$$('nav button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));$$('[data-panel]').forEach(p=>p.classList.toggle('hidden',p.dataset.panel!==t));
+  if(t==='activity')loadMail(); if(t==='settings')fillSettings(); try{localStorage.setItem('ww-tab',t)}catch{} }
+document.addEventListener('click',e=>{const g=e.target.closest('[data-goto]');if(g)go(g.dataset.goto);});
+
+async function load(first){
+  try{S=await api('/api/state');}catch(e){if(e.message!=='Signed out')toast(e.message);return;}
+  $('#login').classList.add('hidden');$('#app').classList.remove('hidden');
+  render();
+  if(first){let t='overview';try{t=localStorage.getItem('ww-tab')||t}catch{};go(t);}
+}
+setInterval(()=>{if(!$('#app').classList.contains('hidden')&&!document.hidden)load(false)},20000);
+
+const fmtTime=iso=>iso?new Date(iso).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'never';
+const shortDay=d=>new Date(d+'T12:00:00Z').toLocaleDateString([], {month:'short',day:'numeric',timeZone:'UTC'});
+
+function render(){
+  const s=S.settings, sc=S.scheduler;
+  const pill=$('#statusPill');
+  if(s.paused){pill.className='pill warn';pill.textContent='Paused';}
+  else if(!sc.inWindow){pill.className='pill info';pill.textContent='Running, outside working hours';}
+  else{pill.className='pill good';pill.textContent='Running';}
+  $('#toggleBtn').textContent=s.paused?'Start warm-up':'Pause all';
+  $('#toggleBtn').className='btn big '+(s.paused?'primary':'');
+  $('#runBtn').disabled=s.paused;
+
+  // Safety banners
+  const probs=[], senders=S.inboxes.filter(i=>i.role==='sender');
+  if(!S.inboxes.length) probs.push(['warn','Add your inboxes in the Inboxes tab to begin.']);
+  S.domains.filter(d=>!d.ok).forEach(d=>probs.push(['bad',`${esc(d.domain)} is missing ${['spf','dkim','dmarc'].filter(k=>!d[k]).map(k=>k.toUpperCase()).join(', ')}. Sending from it is blocked${s.requireDns?'':' <b>(the DNS gate is OFF in Settings)</b>'}.`]));
+  S.inboxes.filter(i=>i.paused&&i.pause_reason).forEach(i=>probs.push(['bad',`${esc(i.email)} paused itself: ${esc(i.pause_reason)}`]));
+  S.inboxes.filter(i=>!i.hasPassword).forEach(i=>probs.push(['warn',`${esc(i.email)} has no app password saved.`]));
+  if(!s.aiKeySet&&s.aiEnabled) probs.push(['warn','No OpenRouter key saved, so emails use the built-in templates. Add a key in Settings.']);
+  if(!s.requireDns) probs.push(['bad','The DNS safety gate is turned off in Settings.']);
+  const lvl=probs.some(p=>p[0]==='bad')?'bad':probs.length?'warn':'good';
+  $('#banners').innerHTML=probs.length?`<div class="banner ${lvl}"><b>${probs.length} thing${probs.length>1?'s':''} to check</b><ul>${probs.map(p=>`<li>${p[1]}</li>`).join('')}</ul></div>`
+    :`<div class="banner good"><b>All safety checks pass.</b> <span class="muted small">Last cycle ${fmtTime(sc.lastTickAt)} · next ${fmtTime(sc.nextTickAt)}</span></div>`;
+
+  // Tiles
+  const t=S.totals, plc=t.placement7d;
+  const plcCls=plc==null?'':plc>=90?'good':plc>=s.autoPauseBelow?'warn':'bad';
+  $('#tiles').innerHTML=[
+    ['Sent today',t.sentToday,`${t.repliesToday} of them replies`],
+    ['Inbox placement, 7 days',plc==null?'–':plc+'%',plc==null?'Not enough data yet':`<span class="pill ${plcCls}">${plc>=90?'Healthy':plc>=s.autoPauseBelow?'Watch':'At risk'}</span>`],
+    ['Rescued from spam, 7 days',t.rescued7d,'Moved back to the inbox'],
+    ['Replies waiting',t.queued,'Sent after a random delay'],
+  ].map(([l,v,sub])=>`<div class="card tile"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${sub}</div></div>`).join('');
+
+  barChart($('#chVolume'),S.daily.map(d=>({x:d.day,parts:[d.sent-d.replies,d.replies]})),['var(--s1)','var(--s2)'],['New','Replies']);
+  lineChart($('#chPlacement'),S.daily.map(d=>({x:d.day,y:d.inbox+d.spam?Math.round(100*d.inbox/(d.inbox+d.spam)):null,n:d.inbox+d.spam})),s.autoPauseBelow);
+
+  // Inbox table
+  $('#inboxTable').innerHTML=`<tr><th>Inbox</th><th>Status</th><th class="hide-sm">Day</th><th>Today</th><th>Placement 7d</th><th class="hide-sm">Health</th></tr>`+
+    (S.inboxes.length?S.inboxes.map(i=>`<tr><td><b>${esc(i.email)}</b><div class="muted small">${i.role==='seed'?'Seed':esc(i.name)}</div></td><td>${statusPill(i)}</td>
+      <td class="hide-sm">${i.role==='seed'?'–':i.day||'starts '+shortDay(i.start_date)}</td>
+      <td>${i.role==='seed'?`<span class="muted small">${i.received7d} received 7d</span>`:`${i.sentToday} / ${i.targetToday}<div class="meter"><i style="width:${i.targetToday?Math.min(100,100*i.sentToday/i.targetToday):0}%"></i></div>`}</td>
+      <td>${i.placement7d==null?'<span class="muted small">no data</span>':`<b>${i.placement7d}%</b> <span class="muted small">${i.inbox7d}/${i.checked7d}</span>`}</td>
+      <td class="hide-sm">${i.health==null?'<span class="muted small">–</span>':`<span class="pill ${i.health>=90?'good':i.health>=75?'warn':'bad'}">${i.health}</span>`}</td></tr>`).join('')
+    :`<tr><td colspan="6" class="muted">No inboxes yet.</td></tr>`);
+
+  // Domains
+  $('#domains').innerHTML=S.domains.length?S.domains.map(d=>`<div class="card" style="margin:0;background:var(--surface-2)"><div class="row spread"><h3>${esc(d.domain)}</h3><span class="pill ${d.ok?'good':'bad'}">${d.ok?'Ready to send':'Blocked'}</span></div>
+    <dl class="kv" style="margin-top:8px">${['spf','dkim','dmarc'].map(k=>`<dt>${k.toUpperCase()}</dt><dd>${d[k]?`<span style="color:var(--good-text)">✓</span> <span class="muted">${esc(d[k].slice(0,70))}</span>`:`<span style="color:var(--bad-text)">✗ missing</span>${k==='dkim'?` <span class="muted">(tried selector ${esc((d.selectorsTried||[]).join(', ')||'google')})</span>`:''}`}</dd>`).join('')}</dl>
+    <div class="muted small" style="margin-top:6px">Checked ${fmtTime(d.checkedAt)}</div></div>`).join(''):'<p class="muted">Add a sender inbox to check its domain.</p>';
+
+  renderInboxCards();
+  renderEvents();
+  const f=$('#mailFilter'), cur=f.value;
+  f.innerHTML='<option value="">All inboxes</option>'+S.inboxes.map(i=>`<option ${i.email===cur?'selected':''}>${esc(i.email)}</option>`).join('');
+}
+
+function statusPill(i){
+  const map={active:['good','Warming up'],slowed:['warn','Slowed down'],seed:['info','Seed'],blocked:[i.paused?'warn':'bad',i.paused?'Paused':'Blocked']};
+  const [c,l]=map[i.status]||['','?'];
+  return `<span class="pill ${c}" title="${esc(i.blocked||'')}">${l}</span>`;
+}
+
+function renderInboxCards(){
+  const box=$('#inboxCards');
+  if(!S.inboxes.length){box.innerHTML='<div class="card muted">No inboxes yet. Add your 6 sending inboxes, then one or two seeds at other providers.</div>';return;}
+  box.innerHTML=S.inboxes.map(i=>`<div class="card ibox" style="margin:0">
+    <div class="row spread"><div><h3>${esc(i.email)}</h3><div class="muted small">${esc(i.name)} · ${i.role==='seed'?'Seed':'Sender'} · ${esc(i.provider)}</div></div>${statusPill(i)}</div>
+    ${i.blocked?`<div class="small" style="color:${i.paused?'var(--warn-text)':'var(--bad-text)'}">${esc(i.blocked)}</div>`:''}
+    ${i.role==='sender'?`<div class="chart" data-ramp="${i.id}"></div><div class="legend" style="margin:0"><span><i style="background:var(--s1)"></i>Sent</span><span><i style="background:var(--ref);height:2px"></i>Planned</span></div>`:''}
+    <dl class="kv"><dt>Warm-up day</dt><dd>${i.role==='seed'?'–':i.day||'starts '+shortDay(i.start_date)}</dd><dt>Sent 7d</dt><dd>${i.sent7d}</dd><dt>Received 7d</dt><dd>${i.received7d}</dd><dt>Errors 7d</dt><dd>${i.errors7d}</dd><dt>Password</dt><dd>${i.hasPassword?'Saved (encrypted)':'<span style="color:var(--bad-text)">Missing</span>'}</dd></dl>
+    <div class="acts">
+      <button class="btn sm" data-act="pause" data-id="${i.id}">${i.paused?'Resume':'Pause'}</button>
+      <button class="btn sm" data-act="test" data-id="${i.id}">Test login</button>
+      ${i.role==='sender'?`<button class="btn sm" data-act="send" data-id="${i.id}">Send one now</button>`:''}
+      <button class="btn sm" data-act="edit" data-id="${i.id}">Edit</button>
+      <button class="btn sm danger" data-act="del" data-id="${i.id}">Remove</button>
+    </div></div>`).join('');
+  S.inboxes.filter(i=>i.role==='sender').forEach(i=>rampVsActual($(`[data-ramp="${i.id}"]`),i));
+}
+
+$('#inboxCards').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-act]'); if(!b)return;
+  const i=S.inboxes.find(x=>x.id==b.dataset.id); b.disabled=true;
+  try{
+    if(b.dataset.act==='pause'){await api('/api/inboxes/'+i.id,{method:'PUT',body:{paused:!i.paused}});toast(i.paused?'Inbox resumed':'Inbox paused');}
+    if(b.dataset.act==='test'){b.textContent='Testing...';const r=await api(`/api/inboxes/${i.id}/test`,{method:'POST'});
+      alert(`${i.email}\n\nSending (SMTP): ${r.smtp==='ok'?'OK':'FAILED: '+r.smtp}\nReading (IMAP): ${r.imap==='ok'?'OK':'FAILED: '+r.imap}`);}
+    if(b.dataset.act==='send'){b.textContent='Sending...';const r=await api(`/api/inboxes/${i.id}/send-test`,{method:'POST'});toast(`Sent to ${r.to}: "${r.subject}" (${r.by==='ai'?'AI':'template'})`);}
+    if(b.dataset.act==='edit'){openInbox(i);}
+    if(b.dataset.act==='del'){if(confirm(`Remove ${i.email}? Its history stays in the stats.`)){await api('/api/inboxes/'+i.id,{method:'DELETE'});toast('Inbox removed');}}
+  }catch(err){toast(err.message);}
+  await load(false);
+});
+
+// Inbox dialog
+const dlg=$('#inboxDlg'), form=$('#inboxForm');
+$('#addInboxBtn').onclick=()=>openInbox(null);
+$('#inboxCancel').onclick=()=>dlg.close();
+function openInbox(i){
+  editing=i; form.reset(); $('#inboxErr').textContent='';
+  $('#inboxDlgTitle').textContent=i?'Edit '+i.email:'Add inbox';
+  form.password.placeholder=i?.hasPassword?'Saved. Leave empty to keep it':'16-character app password';
+  form.password.required=!i;
+  const v=i||{provider:'google',role:'sender',start_date:S.today,...S.providers.google};
+  for(const k of ['email','name','role','provider','start_date','cap','smtp_host','smtp_port','imap_host','imap_port','dkim_selector']) if(form[k]) form[k].value=v[k]??'';
+  dlg.showModal();
+}
+form.provider.onchange=()=>{const p=S.providers[form.provider.value];for(const k in p)form[k].value=p[k];
+  $('#pwHint').textContent={google:'Google: Account, then Security, then 2-Step Verification, then App passwords.',microsoft:'Microsoft: SMTP AUTH must be enabled for the mailbox, and use an app password.',zoho:'Zoho: Settings, then Security, then App Passwords.',custom:'Use the mailbox password or an app password.'}[form.provider.value];};
+form.onsubmit=async e=>{
+  if(e.submitter?.value!=='save')return; e.preventDefault();
+  const body=Object.fromEntries(new FormData(form)); if(!body.password)delete body.password; body.cap=body.cap===''?null:Number(body.cap);
+  try{ if(editing) await api('/api/inboxes/'+editing.id,{method:'PUT',body}); else await api('/api/inboxes',{method:'POST',body});
+    dlg.close(); toast(editing?'Inbox saved':'Inbox added. Press "Test login" to check it.'); await load(false);
+  }catch(err){$('#inboxErr').textContent=err.message;}
+};
+
+// Bulk add
+const bulk=$('#bulkDlg');
+$('#bulkBtn').onclick=()=>{$('#bulkForm').reset();$('#bulkForm').start_date.value=S.today;$('#bulkOut').innerHTML='';bulk.showModal();};
+$('#bulkCancel').onclick=()=>bulk.close();
+$('#bulkForm').onsubmit=async e=>{
+  if(e.submitter?.value!=='save')return; e.preventDefault();
+  try{const r=await api('/api/inboxes/bulk',{method:'POST',body:Object.fromEntries(new FormData(e.target))});
+    $('#bulkOut').innerHTML=r.results.map(x=>`<div style="color:${x.ok?'var(--good-text)':'var(--bad-text)'}">${x.ok?'✓ Added':'✗ '+esc(x.error)}: ${esc(x.email)}</div>`).join('')||'Nothing to add.';
+    if(r.results.every(x=>x.ok))e.target.lines.value=''; await load(false);
+  }catch(err){$('#bulkOut').textContent=err.message;}
+};
+
+// Header actions
+$('#toggleBtn').onclick=async()=>{
+  const starting=S.settings.paused;
+  if(starting&&S.domains.some(d=>!d.ok)&&!confirm('Some domains fail the DNS check, so those inboxes stay blocked. Start the rest?'))return;
+  try{await api('/api/pause',{method:'POST',body:{paused:!starting}});toast(starting?'Warm-up started':'Warm-up paused');}catch(e){toast(e.message);} load(false);
+};
+$('#runBtn').onclick=async()=>{try{await api('/api/run-now',{method:'POST'});toast('Cycle started. Check Activity in a minute.');setTimeout(()=>load(false),8000);}catch(e){toast(e.message);}};
+$('#dnsBtn').onclick=async e=>{e.target.disabled=true;e.target.textContent='Checking...';try{await api('/api/dns-check',{method:'POST'});await load(false);toast('DNS re-checked');}catch(err){toast(err.message);}e.target.disabled=false;e.target.textContent='Re-check DNS';};
+$('#clearErrBtn').onclick=async()=>{await api('/api/errors/clear',{method:'POST'});load(false);};
+
+// Activity
+function renderEvents(){
+  const ic={error:['var(--bad-text)','Error'],warn:['var(--warn-text)','Warning'],send:['var(--accent-text)','Sent'],info:['var(--text-2)','Info']};
+  $('#events').innerHTML=S.events.length?S.events.map(e=>`<div class="ev"><time>${fmtTime(e.at)}</time><div><b class="lv" style="color:${(ic[e.level]||ic.info)[0]}">${(ic[e.level]||ic.info)[1]}</b> ${e.inbox?`<span class="muted">${esc(e.inbox)}</span> `:''}${esc(e.message)}</div></div>`).join(''):'<p class="muted">Nothing yet.</p>';
+}
+async function loadMail(){
+  const q=$('#mailFilter').value; const list=await api('/api/mail?limit=60'+(q?'&inbox='+encodeURIComponent(q):'')).catch(()=>[]);
+  $('#mailList').innerHTML=list.length?list.map(m=>`<div class="mail"><div class="row spread"><div><b>${esc(m.subject)}</b><div class="muted small">${esc(m.sender)} → ${esc(m.recipient)} · ${fmtTime(m.sent_at)}${m.depth?' · reply':''}</div></div>
+    <span class="pill ${m.folder==='inbox'?'good':m.folder==='spam'?'bad':''}">${m.folder==='inbox'?'Inbox':m.folder==='spam'?'Spam, rescued':'Not checked yet'}</span></div><pre>${esc(m.body)}</pre></div>`).join(''):'<p class="muted">No emails yet.</p>';
+}
+$('#mailFilter').onchange=loadMail;
+$('#mailList').addEventListener('click',e=>{const m=e.target.closest('.mail');if(m)m.classList.toggle('open');});
+
+// Settings
+const NUMS=['startHour','endHour','tickMinutes','rampStart','rampPerDay','rampCap','weekendFactor','replyRate','starRate','maxThreadDepth','seedShare','replyDelayMin','replyDelayMax','slowdownBelow','autoPauseBelow'];
+function fillSettings(){
+  const f=$('#settingsForm'), s=S.settings;
+  f.timezone.value=s.timezone;
+  NUMS.forEach(k=>{f[k].value=s[k];const l=S.limits[k];if(l){f[k].min=l[0];f[k].max=l[1];}});
+  f.requireDns.checked=s.requireDns; f.aiEnabled.checked=s.aiEnabled; f.aiModel.value=s.aiModel; f.topics.value=s.topics.join('\n'); f.openrouterKey.value='';
+  f.openrouterKey.placeholder=s.aiKeySet?(s.aiKeyFromEnv?'Set in Railway variables':'Saved (encrypted). Type to replace'):'sk-or-...';
+  $('#aiKeyNote').textContent=s.aiKeySet?'Key is set.':'No key yet.';
+  rampPreview();
+}
+$('#settingsForm').addEventListener('input',e=>{if(['rampStart','rampPerDay','rampCap','weekendFactor'].includes(e.target.name))rampPreview();});
+$('#settingsForm').onsubmit=async e=>{
+  e.preventDefault(); const f=e.target, body={timezone:f.timezone.value,requireDns:f.requireDns.checked,aiEnabled:f.aiEnabled.checked,aiModel:f.aiModel.value.trim(),topics:f.topics.value};
+  NUMS.forEach(k=>body[k]=Number(f[k].value));
+  if(f.openrouterKey.value.trim())body.openrouterKey=f.openrouterKey.value.trim();
+  if(!body.requireDns&&S.settings.requireDns&&!confirm('Turn off the DNS safety gate? Unauthenticated domains will be allowed to send.'))return;
+  try{await api('/api/settings',{method:'PUT',body});$('#saveNote').textContent='Saved '+new Date().toLocaleTimeString();await load(false);fillSettings();toast('Settings saved. Values outside the safe range were adjusted.');}catch(err){toast(err.message);}
+};
+$('#aiTestBtn').onclick=async e=>{
+  const f=$('#settingsForm');
+  if(f.openrouterKey.value.trim()||f.aiModel.value.trim()!==S.settings.aiModel){await api('/api/settings',{method:'PUT',body:{aiModel:f.aiModel.value.trim(),...(f.openrouterKey.value.trim()?{openrouterKey:f.openrouterKey.value.trim()}:{})}}).catch(err=>toast(err.message));f.openrouterKey.value='';}
+  e.target.disabled=true;e.target.textContent='Writing...';const out=$('#aiOut');out.classList.remove('hidden');out.textContent='Asking '+f.aiModel.value+'...';
+  try{const r=await api('/api/ai-test',{method:'POST'});out.textContent=`Subject: ${r.subject}\n\n${r.body}\n\n(${r.model}${r.cost!=null?`, cost $${Number(r.cost).toFixed(5)}`:''})`;await load(false);fillSettings();}
+  catch(err){out.textContent='Failed: '+err.message;}
+  e.target.disabled=false;e.target.textContent='Write a test email';
+};
+
+// ── Charts (inline SVG, one y-axis each, hover tooltips) ──
+function tipFor(el){let t=el.querySelector('.tip');if(!t){t=document.createElement('div');t.className='tip';el.appendChild(t);}return t;}
+function bindTips(el){
+  const t=tipFor(el);
+  el.querySelectorAll('[data-tip]').forEach(r=>{
+    r.addEventListener('mouseenter',()=>{t.innerHTML=r.dataset.tip;t.style.display='block';});
+    r.addEventListener('mousemove',ev=>{const b=el.getBoundingClientRect();t.style.left=Math.min(b.width-60,Math.max(60,ev.clientX-b.left))+'px';t.style.top=(ev.clientY-b.top)+'px';});
+    r.addEventListener('mouseleave',()=>t.style.display='none');
+  });
+}
+const niceMax=v=>{if(v<=5)return 5;const p=Math.pow(10,Math.floor(Math.log10(v)));const n=v/p;return (n<=2?2:n<=5?5:10)*p;};
+function frame(W,H,L,B,T,max,ticks){let s='';for(let k=0;k<=ticks;k++){const v=max*k/ticks,y=B-(B-T)*k/ticks;s+=`<line x1="${L}" x2="${W-4}" y1="${y}" y2="${y}" stroke="var(--grid)"/><text x="${L-6}" y="${y+4}" text-anchor="end">${Math.round(v)}</text>`;}return s;}
+
+function barChart(el,rows,colors,names){
+  const W=520,H=220,L=34,B=190,T=10,max=niceMax(Math.max(1,...rows.map(r=>r.parts.reduce((a,b)=>a+b,0))));
+  const bw=(W-L-4)/rows.length; let s=frame(W,H,L,B,T,max,4);
+  rows.forEach((r,i)=>{let y=B;const x=L+i*bw+1,w=Math.max(2,bw-2);const total=r.parts.reduce((a,b)=>a+b,0);
+    r.parts.forEach((v,k)=>{if(!v)return;const h=(B-T)*v/max;const top=k===r.parts.length-1||!r.parts.slice(k+1).some(Boolean);
+      s+=`<rect x="${x}" y="${y-h+(k?1:0)}" width="${w}" height="${Math.max(1,h-(k?1:0))}" rx="${top?Math.min(3,w/2):0}" fill="${colors[k]}"/>`;y-=h;});
+    s+=`<rect x="${L+i*bw}" y="${T}" width="${bw}" height="${B-T}" fill="transparent" data-tip="<b>${shortDay(r.x)}</b><br>${names.map((n,k)=>`${n}: ${r.parts[k]}`).join('<br>')}<br>Total: ${total}"/>`;
+    if(i%7===0)s+=`<text x="${x}" y="${B+16}">${shortDay(r.x)}</text>`;});
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Emails sent per day, last 30 days">${s}</svg>`;bindTips(el);
+}
+
+function lineChart(el,rows,pauseLine){
+  const W=520,H=220,L=34,B=190,T=10,bw=(W-L-4)/rows.length,y=v=>B-(B-T)*v/100,x=i=>L+i*bw+bw/2;
+  let s=frame(W,H,L,B,T,100,4);
+  s+=`<line x1="${L}" x2="${W-4}" y1="${y(90)}" y2="${y(90)}" stroke="var(--good)" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+  s+=`<line x1="${L}" x2="${W-4}" y1="${y(pauseLine)}" y2="${y(pauseLine)}" stroke="var(--bad)" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+  let d='',pen=false; rows.forEach((r,i)=>{if(r.y==null){pen=false;return;}d+=(pen?'L':'M')+x(i)+' '+y(r.y);pen=true;});
+  s+=`<path d="${d}" fill="none" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  rows.forEach((r,i)=>{if(r.y!=null)s+=`<circle cx="${x(i)}" cy="${y(r.y)}" r="3.5" fill="var(--s1)" stroke="var(--surface)" stroke-width="2"/>`;
+    s+=`<rect x="${L+i*bw}" y="${T}" width="${bw}" height="${B-T}" fill="transparent" data-tip="<b>${shortDay(r.x)}</b><br>${r.y==null?'No emails checked':`${r.y}% in inbox (${r.n} checked)`}"/>`;
+    if(i%7===0)s+=`<text x="${L+i*bw}" y="${B+16}">${shortDay(r.x)}</text>`;});
+  if(!rows.some(r=>r.y!=null))s+=`<text x="${W/2}" y="${H/2}" text-anchor="middle">No placement data yet</text>`;
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Percent of warm-up emails landing in the inbox per day">${s}</svg>`;bindTips(el);
+}
+
+function planned(dayN,date,p){if(dayN<1)return 0;let n=Math.min(p.rampCap,p.rampStart+p.rampPerDay*(dayN-1));const wd=date.getUTCDay();if(wd===0||wd===6)n=Math.ceil(n*p.weekendFactor);return n;}
+function rampPreview(){
+  const f=$('#settingsForm'),p={};['rampStart','rampPerDay','rampCap','weekendFactor'].forEach(k=>{const l=S.limits[k];p[k]=Math.min(l[1],Math.max(l[0],Number(f[k].value)||0));});
+  const W=760,H=200,L=34,B=170,T=10,days=28,start=new Date(S.today+'T12:00:00Z'),bw=(W-L-4)/days,max=niceMax(p.rampCap);
+  let s=frame(W,H,L,B,T,max,5);
+  for(let d=0;d<days;d++){const dt=new Date(start.getTime()+d*864e5),n=planned(d+1,dt,p),h=(B-T)*n/max,x=L+d*bw+1;
+    s+=`<rect x="${x}" y="${B-h}" width="${bw-2}" height="${h}" rx="3" fill="var(--s1)"/><rect x="${L+d*bw}" y="${T}" width="${bw}" height="${B-T}" fill="transparent" data-tip="Day ${d+1} (${shortDay(dt.toISOString().slice(0,10))}): ${n} per sender, ${n*Math.max(1,S.inboxes.filter(i=>i.role==='sender').length)} total"/>`;
+    if(d%7===0)s+=`<text x="${x}" y="${B+16}">Day ${d+1}</text>`;}
+  s+=`<line x1="${L+14*bw}" x2="${L+14*bw}" y1="${T}" y2="${B}" stroke="var(--ref)" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+  $('#chRamp').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Planned ramp for the next 28 days">${s}</svg>`;bindTips($('#chRamp'));
+}
+
+function rampVsActual(el,i){
+  if(!el)return; const W=440,H=130,L=28,B=110,T=8,days=28,p=S.settings;
+  const start=new Date(i.start_date+'T12:00:00Z'),today=new Date(S.today+'T12:00:00Z');
+  const offset=Math.max(0,Math.round((today-start)/864e5)-20),bw=(W-L-4)/days,sent=Object.fromEntries((i.daily||[]).map(d=>[d.day,d.sent]));
+  const pts=[];for(let d=0;d<days;d++){const dt=new Date(start.getTime()+(d+offset)*864e5),key=dt.toISOString().slice(0,10);
+    pts.push({key,plan:Math.min(i.cap||p.rampCap,planned(d+offset+1,dt,p)),sent:dt<=today?(sent[key]||0):null});}
+  const max=niceMax(Math.max(1,...pts.map(q=>Math.max(q.plan,q.sent||0))));
+  let s=frame(W,H,L,B,T,max,2),d='';
+  pts.forEach((q,k)=>{const x=L+k*bw;if(q.sent){const h=(B-T)*q.sent/max;s+=`<rect x="${x+1}" y="${B-h}" width="${bw-2}" height="${h}" rx="2" fill="var(--s1)"/>`;}
+    d+=(k?'L':'M')+(x+bw/2)+' '+(B-(B-T)*q.plan/max);
+    s+=`<rect x="${x}" y="${T}" width="${bw}" height="${B-T}" fill="transparent" data-tip="${shortDay(q.key)}: ${q.sent==null?'upcoming':q.sent+' sent'}, plan ${q.plan}"/>`;});
+  s+=`<path d="${d}" fill="none" stroke="var(--ref)" stroke-width="2" stroke-dasharray="4 3" pointer-events="none"/>`;
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Planned versus sent for ${esc(i.email)}">${s}</svg>`;bindTips(el);
+}
+
+load(true);
+</script>
+</body>
+</html>
