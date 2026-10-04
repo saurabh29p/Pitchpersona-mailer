@@ -91,6 +91,39 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--surface-2)}
 .step textarea{font:13px/1.5 ui-monospace,monospace;min-height:140px}
 .prev{white-space:pre-wrap;background:var(--surface-2);border-radius:8px;padding:10px;font-size:13px;margin:6px 0 0}
 .hidden{display:none!important}
+a{color:var(--accent-text)}
+/* Setup guide: a vertical stepper that ticks itself off */
+.prog{height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden;margin:6px 0 16px}.prog i{display:block;height:100%;background:var(--grad);border-radius:4px;transition:width .4s}
+.steps{list-style:none;margin:0;padding:0}
+.stp{position:relative;display:grid;grid-template-columns:30px minmax(0,1fr);gap:0 12px;padding:0 0 14px}
+.stp:not(:last-child)::before{content:"";position:absolute;left:14px;top:32px;bottom:2px;width:2px;background:var(--line)}
+.stp.done:not(:last-child)::before{background:var(--good)}
+.stp .dot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;border:2px solid var(--line);background:var(--surface);color:var(--text-2);z-index:1}
+.stp.done .dot{background:var(--good);border-color:var(--good);color:#06180D}
+.stp.cur .dot{border-color:var(--accent);color:var(--accent-text);box-shadow:0 0 0 4px rgba(255,106,26,.2)}
+.stp.prob .dot{border-color:var(--bad);color:var(--bad-text)}
+.stp .sh{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;cursor:pointer;min-height:30px;background:none;border:0;padding:4px 0 0;text-align:left;width:100%}
+.stp .sh b{font-size:15px}.stp .st{display:block;font-size:13px;color:var(--muted);font-weight:400}
+.stp.done .sh b{color:var(--text-2)}
+.stp .chev{color:var(--muted);transition:transform .2s;flex:none}.stp.open .chev{transform:rotate(90deg)}
+.stp .sb{display:none;margin-top:10px;padding:12px 14px;background:var(--surface-2);border-radius:10px;font-size:14px}
+.stp.open .sb{display:block}
+.sb ol,.sb ul{margin:4px 0 8px;padding-left:20px}.sb li{margin:4px 0}
+.sb .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.sb .note{font-size:13px;color:var(--muted);margin:6px 0 0}
+.sb .prob{color:var(--bad-text);font-size:13px;margin:6px 0 0}
+.opt{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:0 7px;margin-left:6px;vertical-align:2px}
+.rec{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;font-size:13px;margin:6px 0}.rec dt{color:var(--text-2)}.rec dd{margin:0;word-break:break-all}
+/* Guide tab visuals */
+.flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:26px}
+.flow>div{position:relative;background:var(--surface-2);border-radius:12px;padding:14px;font-size:14px}
+.flow>div:not(:last-child)::after{content:"\2192";position:absolute;right:-20px;top:50%;transform:translateY(-50%);color:var(--accent-text);font-weight:700;font-size:18px}
+.flow b{display:block;margin-bottom:4px}.flow .n{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--grad);color:var(--accent-ink);font-size:12px;font-weight:700;margin-right:6px}
+.tl{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.tl>div{border-top:4px solid var(--line);padding-top:8px;font-size:14px}.tl>div.past{border-color:var(--good)}.tl>div.now{border-color:var(--accent)}
+.tl .d{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:16px}
+.legend-list{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 12px;align-items:center;font-size:14px}
+@media (max-width:760px){.flow{grid-template-columns:minmax(0,1fr);gap:22px}.flow>div:not(:last-child)::after{content:"\2193";right:auto;left:50%;top:auto;bottom:-22px;transform:translateX(-50%)}}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}.kv dt{color:var(--text-2)}.kv dd{margin:0;word-break:break-all}
 .grid>.card{margin:0}.grid{margin-bottom:16px}
 @media (max-width:640px){.tile .val{font-size:24px}.hide-sm{display:none}header{position:static}.hrow{gap:8px}.hrow h1{flex-basis:100%}.big{padding:8px 14px}.tile{padding:12px}.g4{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}
@@ -124,7 +157,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--surface-2)}
     <button role="tab" data-tab="replies" aria-selected="false">Replies <span id="replyBadge" class="pill bad hidden" style="padding:0 7px"></span></button>
     <button role="tab" data-tab="activity" aria-selected="false">Activity</button>
     <button role="tab" data-tab="settings" aria-selected="false">Settings</button>
-    <button role="tab" data-tab="help" aria-selected="false">How it works</button>
+    <button role="tab" data-tab="help" aria-selected="false">Guide</button>
   </nav>
 </header>
 
@@ -133,6 +166,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--surface-2)}
 
   <!-- OVERVIEW -->
   <section data-panel="overview">
+    <div id="guideBox"></div>
     <div class="grid g4" id="tiles"></div>
     <div class="grid g2">
       <div class="card"><h2>Emails per day</h2><div class="legend"><span><i style="background:var(--s1)"></i>New emails</span><span><i style="background:var(--s2)"></i>Replies</span></div><div class="chart" id="chVolume"></div></div>
@@ -161,6 +195,7 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--surface-2)}
         <div class="row"><button class="btn sm" id="campBack">← Campaigns</button><h2 id="campTitle" style="margin:0"></h2><span id="campStatus" class="pill"></span></div>
         <div class="row"><button class="btn sm" id="campTestBtn">Send a test</button><button class="btn sm danger" id="campArchive">Archive</button><button class="btn big" id="campToggle">Start</button></div>
       </div>
+      <div class="banner warn hidden" id="campHint" style="margin-bottom:12px"></div>
       <div class="grid g4" id="campTiles"></div>
       <div class="card"><h2>Sent and replies per day</h2><div class="legend"><span><i style="background:var(--s1)"></i>Sent</span><span><i style="background:var(--s2)"></i>Replies</span></div><div class="chart" id="chCamp"></div></div>
       <nav class="subnav" style="padding:0;margin:0 0 12px;max-width:none">
@@ -299,6 +334,32 @@ tr.click{cursor:pointer}tr.click:hover td{background:var(--surface-2)}
 
   <!-- HELP -->
   <section data-panel="help" class="hidden">
+    <div class="card"><div class="row spread"><h2 style="margin:0">Setup checklist</h2><span class="muted small" id="guidePct"></span></div>
+      <div class="prog"><i id="guideBar" style="width:0"></i></div>
+      <p class="muted small" style="margin-top:-6px">Each step ticks itself off when the mailer can see it's done. Tap a step for instructions.</p>
+      <ol class="steps" id="guideFull"></ol></div>
+    <div class="card"><h2>What happens every cycle</h2><p class="muted small" id="flowWhen" style="margin-top:0"></p>
+      <div class="flow">
+        <div><b><span class="n">1</span>Send</b>Each sending inbox writes a short, ordinary email to one of your other inboxes or a seed. Plain text, no links, within today's limit.</div>
+        <div><b><span class="n">2</span>Land</b>The receiving inbox is checked. Landing in the inbox counts toward placement. Anything in spam is moved back to the inbox.</div>
+        <div><b><span class="n">3</span>Engage</b>The email is opened, marked important and sometimes starred. These are the signals that tell Google and Microsoft the mail is wanted.</div>
+        <div><b><span class="n">4</span>Reply</b>About a third get a reply after a random, human-looking delay, so real back-and-forth threads build up.</div>
+      </div></div>
+    <div class="card"><h2>Your warm-up plan</h2><p class="muted small" style="margin-top:0">Per sending inbox, from its own day 1. Change the numbers under Settings, Ramp.</p><div class="tl" id="planTl"></div></div>
+    <div class="card"><h2>What the colours mean</h2><div class="legend-list">
+      <span class="pill">Ready</span><span>Set up and waiting for you to press Start warm-up.</span>
+      <span class="pill good">Warming up</span><span>All good. The inbox is sending on its ramp.</span>
+      <span class="pill warn">Slowed down</span><span>Placement dipped below the slowdown line, so volume is halved until it recovers. Nothing to do.</span>
+      <span class="pill warn">Paused</span><span>You paused it, or a safety rule did. The reason is shown on the inbox. Fix that first, then press Resume.</span>
+      <span class="pill bad">Blocked</span><span>It can't send: DNS is missing for its domain, or no app password is saved.</span>
+      <span class="pill info">Seed</span><span>Receives and replies only. Used to see how outside providers treat your mail.</span>
+    </div></div>
+    <div class="card"><h2>Your daily two-minute check</h2><ol style="margin:0;padding-left:20px">
+      <li>Open Overview. The top banner should be green.</li>
+      <li>Inbox placement should stay at 90% or more. A few days below that is the moment to slow down, not speed up.</li>
+      <li>Open Replies once campaigns run, and answer real people there or in Gmail.</li>
+      <li>If an inbox paused itself, read the reason on the inbox before pressing Resume.</li>
+    </ol></div>
     <div class="card"><h2>What it does every few minutes</h2>
       <ol>
         <li><b>Reads</b> every inbox and finds warm-up emails. Any it finds in spam are moved back to the inbox, and every one is marked read and important. Some get starred.</li>
@@ -392,7 +453,7 @@ async function api(path,opts={}){
   if(!r.ok) throw new Error(j.error||('Error '+r.status));
   return j;
 }
-function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',3500);}
+function toast(m,ms){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',ms||(m.length>60?7000:3500));}
 function showLogin(){$('#app').classList.add('hidden');$('#login').classList.remove('hidden');$('#pw').focus();}
 $('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginErr').textContent='';
   try{await api('/api/login',{method:'POST',body:{password:$('#pw').value}});$('#pw').value='';await load(true);}catch(err){$('#loginErr').textContent=err.message;}};
@@ -417,20 +478,29 @@ const shortDay=d=>new Date(d+'T12:00:00Z').toLocaleDateString([], {month:'short'
 function render(){
   const s=S.settings, sc=S.scheduler;
   const pill=$('#statusPill');
+  const R=S.readiness||{};
+  // The pill only says "Running" when something can actually be sent.
   if(s.paused){pill.className='pill warn';pill.textContent='Paused';}
+  else if(R.startBlock){pill.className='pill bad';pill.textContent='On, but no inboxes to use';}
+  else if(!R.readySenders){pill.className='pill warn';pill.textContent='On, but no inbox can send yet';}
   else if(!sc.inWindow){pill.className='pill info';pill.textContent='Running, outside working hours';}
   else{pill.className='pill good';pill.textContent='Running';}
   $('#toggleBtn').textContent=s.paused?'Start warm-up':'Pause all';
   $('#toggleBtn').className='btn big '+(s.paused?'primary':'');
-  $('#runBtn').disabled=s.paused;
+  $('#runBtn').disabled=s.paused||!!R.startBlock;
+  $('#runBtn').title=s.paused?'Press Start warm-up first':R.startBlock||'Runs one cycle now, outside working hours too. Every limit still applies.';
 
   // Safety banners
   const probs=[], senders=S.inboxes.filter(i=>i.role==='sender');
   if(S.storage&&!S.storage.persistent) probs.push(['bad',`No Railway volume is mounted at <b>${esc(S.storage.dataDir)}</b>, so inboxes, passwords and history are erased on every deploy. Add a volume with that mount path.`]);
-  if(!S.inboxes.length) probs.push(['warn','Add your inboxes in the Inboxes tab to begin.']);
+  if(!s.paused&&R.startBlock) probs.push(['bad',`Warm-up is switched on, but nothing is being sent. ${esc(R.startBlock)}`]);
+  else if(!s.paused&&!R.readySenders&&senders.length) probs.push(['bad','Warm-up is switched on, but no inbox can send yet, so nothing is going out. The items below say why.']);
+  else if(!S.inboxes.length) probs.push(['warn','Add your inboxes in the Inboxes tab to begin.']);
   S.domains.filter(d=>!d.ok).forEach(d=>probs.push(['bad',`${esc(d.domain)} is missing ${['spf','dkim','dmarc'].filter(k=>!d[k]).map(k=>k.toUpperCase()).join(', ')}. ${s.requireDns?'Sending from it is blocked.':' <b>The DNS gate is off in Settings, so it can still send, and its mail will likely land in spam.</b>'}`]));
   S.inboxes.filter(i=>i.paused&&i.pause_reason).forEach(i=>probs.push(['bad',`${esc(i.email)} paused itself: ${esc(i.pause_reason)}`]));
   S.inboxes.filter(i=>!i.hasPassword).forEach(i=>probs.push(['warn',`${esc(i.email)} has no app password saved.`]));
+  S.inboxes.filter(i=>i.hasPassword&&i.login==='failed'&&!i.paused).forEach(i=>probs.push(['bad',`${esc(i.email)} failed its last login test. Check the app password and that IMAP is on, then press Test login again.`]));
+  S.domains.filter(d=>d.signing&&!['pass','signed'].includes(d.signing.result)).forEach(d=>probs.push(['warn',`Mail from ${esc(d.domain)} isn't signed with your DKIM key yet (${esc(d.signing.result==='unaligned'?"Google's default key was used":'dkim='+d.signing.result)}). In Google Admin open Apps, Google Workspace, Gmail, Authenticate email, pick ${esc(d.domain)} and click Start authentication.`]));
   if(!s.aiKeySet&&s.aiEnabled) probs.push(['warn','No OpenRouter key saved, so emails use the built-in templates. Add a key in Settings.']);
   if(!s.requireDns) probs.push(['bad','The DNS safety gate is turned off in Settings.']);
   const lvl=probs.some(p=>p[0]==='bad')?'bad':probs.length?'warn':'good';
@@ -466,24 +536,28 @@ function render(){
 
   renderInboxCards();
   renderEvents();
+  renderGuide();
   const f=$('#mailFilter'), cur=f.value;
   f.innerHTML='<option value="">All inboxes</option>'+S.inboxes.map(i=>`<option ${i.email===cur?'selected':''}>${esc(i.email)}</option>`).join('');
 }
 
 function statusPill(i){
   const map={active:['good','Warming up'],slowed:['warn','Slowed down'],seed:['info','Seed'],blocked:[i.paused?'warn':'bad',i.paused?'Paused':'Blocked']};
-  const [c,l]=map[i.status]||['','?'];
-  return `<span class="pill ${c}" title="${esc(i.blocked||'')}">${l}</span>`;
+  // While the whole mailer is paused nothing warms up, so a healthy inbox only says it's ready.
+  const [c,l]=S.settings.paused&&['active','slowed'].includes(i.status)?['','Ready']:map[i.status]||['','?'];
+  return `<span class="pill ${c}" title="${esc(i.blocked||(l==='Ready'?'Waiting for Start warm-up':''))}">${l}</span>`;
 }
 
 function renderInboxCards(){
   const box=$('#inboxCards');
-  if(!S.inboxes.length){box.innerHTML='<div class="card muted">No inboxes yet. Add your 6 sending inboxes, then one or two seeds at other providers.</div>';return;}
+  if(!S.inboxes.length){box.innerHTML=`<div class="card" style="grid-column:1/-1"><h2>Add your first inboxes</h2>${HOW_PASSWORDS}
+    <div class="row" style="margin-top:12px"><button class="btn primary" data-g="bulk">Add several at once</button><button class="btn" data-g="add">Add one inbox</button></div></div>`;return;}
   box.innerHTML=S.inboxes.map(i=>`<div class="card ibox" style="margin:0">
     <div class="row spread"><div><h3>${esc(i.email)}</h3><div class="muted small">${esc(i.name)} · ${i.role==='seed'?'Seed':'Sender'} · ${esc(i.provider)}</div></div>${statusPill(i)}</div>
     ${i.blocked?`<div class="small" style="color:${i.paused?'var(--warn-text)':'var(--bad-text)'}">${esc(i.blocked)}</div>`:''}
     ${i.role==='sender'?`<div class="chart" data-ramp="${i.id}"></div><div class="legend" style="margin:0"><span><i style="background:var(--s1)"></i>Sent</span><span><i style="background:var(--ref);height:2px"></i>Planned</span></div>`:''}
-    <dl class="kv"><dt>Warm-up day</dt><dd>${i.role==='seed'?'–':i.day||'starts '+shortDay(i.start_date)}</dd><dt>Sent 7d</dt><dd>${i.sent7d}</dd><dt>Received 7d</dt><dd>${i.received7d}</dd><dt>Errors 7d</dt><dd>${i.errors7d}</dd><dt>Password</dt><dd>${i.hasPassword?'Saved (encrypted)':'<span style="color:var(--bad-text)">Missing</span>'}</dd></dl>
+    <dl class="kv"><dt>Warm-up day</dt><dd>${i.role==='seed'?'–':i.day||'starts '+shortDay(i.start_date)}</dd><dt>Sent 7d</dt><dd>${i.sent7d}</dd><dt>Received 7d</dt><dd>${i.received7d}</dd><dt>Errors 7d</dt><dd>${i.errors7d}</dd><dt>Password</dt><dd>${i.hasPassword?'Saved (encrypted)':'<span style="color:var(--bad-text)">Missing</span>'}</dd>
+      <dt>Login</dt><dd>${i.login==='ok'?`<span style="color:var(--good-text)">✓ Works</span> <span class="muted">tested ${fmtTime(i.loginAt)}</span>`:i.login==='failed'?`<span style="color:var(--bad-text)">✗ Failed ${fmtTime(i.loginAt)}</span>`:'<span class="muted">Not tested yet. Press Test login.</span>'}</dd></dl>
     <div class="acts">
       <button class="btn sm" data-act="pause" data-id="${i.id}">${i.paused?'Resume':'Pause'}</button>
       <button class="btn sm" data-act="test" data-id="${i.id}">Test login</button>
@@ -545,13 +619,147 @@ $('#bulkForm').onsubmit=async e=>{
 
 // Header actions
 $('#toggleBtn').onclick=async()=>{
-  const starting=S.settings.paused;
-  if(starting&&S.domains.some(d=>!d.ok)&&!confirm('Some domains fail the DNS check, so those inboxes stay blocked. Start the rest?'))return;
-  try{await api('/api/pause',{method:'POST',body:{paused:!starting}});toast(starting?'Warm-up started':'Warm-up paused');}catch(e){toast(e.message);} load(false);
+  const starting=S.settings.paused, R=S.readiness||{};
+  if(starting&&R.startBlock){toast(R.startBlock,8000);go('inboxes');return;}
+  if(starting&&!R.readySenders){if(!confirm('No inbox can send yet. The Overview lists why (DNS, missing password or paused). Switch on anyway? Sending starts by itself once an inbox is ready.'))return;}
+  else if(starting&&S.domains.some(d=>!d.ok)&&!confirm('Some domains fail the DNS check, so their inboxes stay blocked. Start the others?'))return;
+  try{await api('/api/pause',{method:'POST',body:{paused:!starting}});
+    toast(!starting?'Everything paused':R.readySenders?`Warm-up started with ${R.readySenders} sending inbox${R.readySenders>1?'es':''}`:'Switched on. Nothing sends until an inbox is ready.');}
+  catch(e){toast(e.message,8000);if(/inbox/i.test(e.message))go('inboxes');}
+  load(false);
 };
-$('#runBtn').onclick=async()=>{try{await api('/api/run-now',{method:'POST'});toast('Cycle started. Check Activity in a minute.');setTimeout(()=>load(false),8000);}catch(e){toast(e.message);}};
+$('#runBtn').onclick=async()=>{try{await api('/api/run-now',{method:'POST'});toast(S.readiness?.readySenders?'Cycle started. Check Activity in a minute.':'Cycle started, but no inbox can send yet, so it will only check mailboxes.');setTimeout(()=>load(false),8000);}catch(e){toast(e.message,8000);}};
 $('#dnsBtn').onclick=async e=>{e.target.disabled=true;e.target.textContent='Checking...';try{await api('/api/dns-check',{method:'POST'});await load(false);toast('DNS re-checked');}catch(err){toast(err.message);}e.target.disabled=false;e.target.textContent='Re-check DNS';};
 $('#clearErrBtn').onclick=async()=>{await api('/api/errors/clear',{method:'POST'});load(false);};
+
+// ── Setup guide: every step ticks itself off from live state ──────────────────
+const HOW_PASSWORDS=`<ol>
+  <li>In <a href="https://admin.google.com" target="_blank" rel="noopener">Google Admin</a>, allow 2-Step Verification (Security, Authentication, 2-step verification) and turn on IMAP (Apps, Google Workspace, Gmail, End User Access, POP and IMAP access).</li>
+  <li>Sign in as each inbox, turn on <a href="https://myaccount.google.com/signinoptions/twosv" target="_blank" rel="noopener">2-Step Verification</a>, then create an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">app password</a> named Mailer. Copy the 16 letters.</li>
+  <li>Add each inbox here as a <b>Sender</b> with its app password. To add several at once, write one line per inbox: <code>email, app password, name</code>.</li>
+  <li>Optional: add one or two <b>Seeds</b>, personal Gmail or Outlook inboxes at other providers. They only receive and reply.</li>
+</ol>`;
+const guideOpen=new Set(); let guideCur=null;
+const ramp=d=>{const s=S.settings;return Math.min(s.rampCap,s.rampStart+s.rampPerDay*(d-1));};
+const plural=(n,one,many)=>`${n} ${n===1?one:(many||one+'s')}`;
+const ext=(href,text)=>`<a href="${href}" target="_blank" rel="noopener">${text}</a>`;
+
+function guideSteps(){
+  const s=S.settings,R=S.readiness||{},t=S.totals,ins=S.inboxes,snd=ins.filter(i=>i.role==='sender'),seeds=ins.length-snd.length;
+  const doms=S.domains,pw=ins.filter(i=>i.hasPassword),okLogin=ins.filter(i=>i.login==='ok'),badLogin=ins.filter(i=>i.login==='failed'),untested=pw.filter(i=>i.login!=='ok');
+  const N=s.coldMinWarmDays,bestDay=Math.max(0,...snd.map(i=>i.day||0)),coldReady=snd.filter(i=>i.coldOk).length;
+  const signed=d=>!!d.signing&&['pass','signed'].includes(d.signing.result), unsigned=doms.filter(d=>d.signing&&!signed(d));
+  const blockedNow=s.paused||!!R.startBlock;
+  return [
+    {id:'volume',title:'Keep your data safe',done:!!S.storage.persistent,prob:!S.storage.persistent,
+      status:S.storage.persistent?'Inboxes and history are saved on a volume':'Not saved yet. A redeploy erases inboxes and passwords',
+      body:`<ol><li>In Railway, open this project. Right-click the empty canvas (or press Ctrl K) and choose <b>Volume</b>.</li><li>Attach it to this service and set the mount path to <code>${esc(S.storage.dataDir)}</code>.</li><li>Railway redeploys by itself. This step ticks once the volume is found.</li></ol>`},
+    {id:'inboxes',title:'Add your inboxes',done:snd.length>0&&ins.length>=2,
+      status:ins.length?`${plural(snd.length,'sending inbox','sending inboxes')}, ${plural(seeds,'seed')}`+(ins.length<2?'. Add at least one more':''):'None yet. You need at least two',
+      body:`<p style="margin:0">Warm-up sends emails between your own inboxes, so it needs at least two. Add every inbox you want to warm up as a <b>Sender</b>, and keep your main domain's inboxes out.</p>
+        <p class="note">Seeds are optional: personal Gmail or Outlook inboxes at other providers. They only receive and reply, which shows how outside providers treat your mail.</p>
+        <div class="acts"><button class="btn primary sm" data-g="bulk">Add several at once</button><button class="btn sm" data-g="add">Add one inbox</button></div>`},
+    {id:'login',title:'Create app passwords and test each login',done:ins.length>=2&&okLogin.length===ins.length,prob:badLogin.length>0,
+      status:!ins.length?'Add inboxes first':`${okLogin.length} of ${ins.length} logins work`+(badLogin.length?`, ${badLogin.length} failed`:'')+(ins.length>pw.length?`, ${ins.length-pw.length} without a password`:''),
+      body:`<ol><li>In ${ext('https://admin.google.com','Google Admin')}, allow 2-Step Verification (Security, Authentication, 2-step verification) and turn on IMAP (Apps, Google Workspace, Gmail, End User Access, POP and IMAP access).</li>
+        <li>Sign in as each inbox, turn on ${ext('https://myaccount.google.com/signinoptions/twosv','2-Step Verification')}, then create an ${ext('https://myaccount.google.com/apppasswords','app password')} named Mailer and copy the 16 letters.</li>
+        <li>Paste it into the inbox here (Inboxes, Edit, App password).</li>
+        <li>Press <b>Test login</b>. It checks both sending (SMTP) and reading (IMAP).</li></ol>
+        ${badLogin.length?`<p class="prob">Failed: ${badLogin.map(i=>esc(i.email)).join(', ')}. Usually the app password was mistyped, or IMAP is off in Google Admin.</p>`:''}
+        ${ins.length>pw.length?`<p class="prob">No app password yet: ${ins.filter(i=>!i.hasPassword).map(i=>esc(i.email)).join(', ')}.</p>`:''}
+        <div class="acts">${untested.length?`<button class="btn primary sm" data-g="testall">Test ${untested.length===1?'1 login':`${untested.length} logins`}</button>`:''}<button class="btn sm" data-goto="inboxes">Open Inboxes</button></div>`},
+    {id:'dns',title:'Publish SPF, DKIM and DMARC',done:doms.length>0&&doms.every(d=>d.ok),prob:doms.some(d=>!d.ok),
+      status:!doms.length?'Add a sending inbox first':`${doms.filter(d=>d.ok).length} of ${plural(doms.length,'domain')} pass`,
+      body:`<p style="margin:0">At your DNS host, add three TXT records for each sending domain:</p>
+        <dl class="rec"><dt>SPF</dt><dd>Host <code>@</code>, value <code>v=spf1 include:_spf.google.com ~all</code></dd>
+        <dt>DKIM</dt><dd>Host <code>google._domainkey</code>, value from Google Admin (Apps, Google Workspace, Gmail, Authenticate email, Generate new record)</dd>
+        <dt>DMARC</dt><dd>Host <code>_dmarc</code>, value <code>v=DMARC1; p=none; rua=mailto:you@yourdomain</code></dd></dl>
+        ${doms.filter(d=>!d.ok).map(d=>`<p class="prob">${esc(d.domain)} is missing ${['spf','dkim','dmarc'].filter(k=>!d[k]).map(k=>k.toUpperCase()).join(', ')}.</p>`).join('')}
+        <p class="note">New records can take up to an hour to show. Results are kept for 6 hours, so press Re-check DNS after a change.</p>
+        <div class="acts"><button class="btn primary sm" data-g="dns" ${doms.length?'':'disabled'}>Re-check DNS</button></div>`},
+    {id:'dkim',title:'Turn on DKIM signing in Google',done:doms.length>0&&!unsigned.length&&(doms.every(signed)||!!s.dkimConfirmed),prob:unsigned.length>0,
+      status:!doms.length?'Add a sending inbox first':unsigned.length?`Not signing with your key yet: ${unsigned.map(d=>d.domain).join(', ')}`:doms.every(signed)?'Confirmed on received warm-up mail':s.dkimConfirmed?'Marked done. It confirms itself once warm-up mail arrives':'Not confirmed yet',
+      body:`<ol><li>In ${ext('https://admin.google.com','Google Admin')}, open Apps, Google Workspace, Gmail, <b>Authenticate email</b>.</li><li>Pick each sending domain and click <b>Start authentication</b>. Its status should change to "Authenticating email".</li></ol>
+        <p class="note">The DNS record alone isn't enough. Until you click Start, Google signs with its own default key and your DKIM record goes unused. This step ticks itself once a warm-up email arrives signed with your domain's key.</p>
+        ${unsigned.map(d=>`<p class="prob">${esc(d.domain)}: the last warm-up email ${d.signing.result==='unaligned'?"was signed with Google's default key, not yours":`arrived with dkim=${esc(d.signing.result)}`}.</p>`).join('')}
+        ${doms.filter(signed).map(d=>`<p class="note" style="color:var(--good-text)">✓ ${esc(d.domain)} is signed with its own key (seen ${fmtTime(d.signing.at)}).</p>`).join('')}
+        ${doms.length&&!doms.every(signed)?`<div class="acts">${s.dkimConfirmed?`<button class="btn sm" data-g="dkimno">Undo "I've done this"</button>`:`<button class="btn primary sm" data-g="dkimyes">I've clicked Start authentication</button>`}</div>`:''}`},
+    {id:'ai',title:'Connect the AI writer',optional:true,done:!!s.aiKeySet&&!!s.aiEnabled,
+      status:s.aiKeySet?(s.aiEnabled?`Writing with ${s.aiModel}`:'Key saved, but AI writing is switched off in Settings'):'Built-in templates are used until then',
+      body:`<ol><li>Create a key at ${ext('https://openrouter.ai/keys','openrouter.ai/keys')} and add a few dollars of credit. One warm-up email costs a fraction of a cent.</li><li>Paste it under Settings, AI writer, and save. Then press <b>Write a test email</b> to see one.</li></ol>
+        <p class="note">Without a key, emails come from built-in templates. They work, but are less varied.</p><div class="acts"><button class="btn sm" data-goto="settings">Open Settings</button></div>`},
+    {id:'start',title:'Start warm-up',done:!s.paused&&!R.startBlock&&R.readySenders>0,prob:!s.paused&&(!!R.startBlock||!R.readySenders),
+      status:s.paused?'Not started':R.startBlock?R.startBlock:!R.readySenders?'Switched on, but no inbox can send yet':`Running with ${plural(R.readySenders,'sending inbox','sending inboxes')}`,
+      body:`<p style="margin:0">Press <b>Start warm-up</b> at the top. It works from ${s.startHour}:00 to ${s.endHour}:00 (${esc(s.timezone)}) and checks every ${s.tickMinutes} minutes. On day 1 each sending inbox sends ${ramp(1)} emails, then ${s.rampPerDay} more each day.</p>
+        ${R.startBlock?`<p class="prob">Can't start yet: ${esc(R.startBlock)}</p>`:!s.paused&&!R.readySenders?`<p class="prob">No inbox can send yet. The banner at the top of Overview lists why for each one.</p>`:''}
+        <div class="acts">${s.paused?`<button class="btn primary sm" data-g="start" ${R.startBlock?'disabled':''}>Start warm-up</button>`:''}<button class="btn sm" data-goto="settings">Change working hours</button></div>`},
+    {id:'flow',title:'See the first emails land',done:t.sentEver>0&&t.seenEver>0,
+      status:t.sentEver?`${t.sentEver} sent, ${t.seenEver} checked on arrival`:S.scheduler.inWindow?'Nothing sent yet':'Nothing sent yet. It is outside working hours now',
+      body:`<p style="margin:0">Within a cycle or two, <b>Activity</b> lists every email and where it landed: <span class="pill good">Inbox</span> or <span class="pill bad">Spam, rescued</span>. Arrival is checked on the next cycle. To go now, press <b>Run a cycle now</b>. It ignores working hours but keeps every limit.</p>
+        <div class="acts"><button class="btn sm" data-g="run" ${blockedNow?'disabled title="Start warm-up first"':''}>Run a cycle now</button><button class="btn sm" data-goto="activity">Open Activity</button></div>`},
+    {id:'wait',title:`Warm up for ${N} days`,done:coldReady>0,
+      status:coldReady?`${plural(coldReady,'inbox','inboxes')} ready for campaigns`:bestDay&&t.sentEver?`Day ${bestDay} of ${N}`+(t.placement7d!=null?`, placement ${t.placement7d}%`:''):'Starts with warm-up',
+      body:`<div class="prog" style="margin:0 0 10px"><i style="width:${Math.round(100*Math.min(1,bestDay/N))}%"></i></div>
+        <p style="margin:0">Leave it running. Volume climbs by ${s.rampPerDay} a day up to ${s.rampCap}. An inbox unlocks campaigns on day ${N} once its placement is ${s.coldMinPlacement}% or more${bestDay&&bestDay<N?`, so around <b>${new Date(Date.now()+(N-bestDay)*86400000).toLocaleDateString([], {month:'short',day:'numeric'})}</b> for your furthest inbox`:''}.</p>
+        <p class="note">Check Overview once a day. If placement drops, the mailer slows down or pauses that inbox by itself.</p>`},
+    {id:'campaign',title:'Launch your first campaign',done:S.campaigns.active>0,
+      status:S.campaigns.active?`${plural(S.campaigns.active,'campaign')} switched on`:S.campaigns.count?`${plural(S.campaigns.count,'campaign')} drafted, none switched on`:'After warm-up',
+      body:`<ol><li>Open Campaigns and press <b>New campaign</b>. Start from the PitchPersona sequence or write your own.</li><li>Add leads: paste a CSV, or point PitchPersona's Custom webhook at the campaign's ingest address.</li><li>Pick the sending inboxes, preview a few emails, then press <b>Start</b>. Begin at 10 to 15 a day per inbox.</li></ol>
+        <p class="note">You can build a campaign now. It waits until an inbox has earned it.</p><div class="acts"><button class="btn sm" data-goto="campaigns">Open Campaigns</button></div>`},
+  ];
+}
+
+function renderGuide(){
+  const s=S.settings, steps=guideSteps(), req=steps.filter(x=>!x.optional), doneN=req.filter(x=>x.done).length;
+  const cur=steps.find(x=>!x.done&&!x.optional);
+  if(cur&&cur.id!==guideCur){guideCur=cur.id;guideOpen.add(cur.id);}   // open the next step as soon as it becomes next
+  const li=(x,n)=>`<li class="stp${x.done?' done':x===cur?' cur':''}${x.prob&&!x.done?' prob':''}${guideOpen.has(x.id)?' open':''}" data-step="${x.id}">
+    <span class="dot" aria-hidden="true">${x.done?'✓':n}</span>
+    <div><button class="sh" type="button" aria-expanded="${guideOpen.has(x.id)}"><span><b>${esc(x.title)}</b>${x.optional?'<span class="opt">Optional</span>':''}<span class="st">${x.done?'Done. ':''}${esc(x.status)}</span></span><span class="chev" aria-hidden="true">›</span></button>
+    <div class="sb">${x.body}</div></div></li>`;
+  const pct=n=>Math.round(100*n);
+  $('#guideFull').innerHTML=steps.map((x,k)=>li(x,k+1)).join('');
+  $('#guidePct').textContent=`${doneN} of ${req.length} done`; $('#guideBar').style.width=pct(doneN/req.length)+'%';
+  // Overview: the checklist up to Start until warm-up is running, then one line about what's next.
+  const setup=steps.slice(0,steps.findIndex(x=>x.id==='start')+1), setupReq=setup.filter(x=>!x.optional), setupDone=setupReq.filter(x=>x.done).length;
+  const box=$('#guideBox');
+  if(setupDone<setupReq.length) box.innerHTML=`<div class="card"><div class="row spread"><h2 style="margin:0">Get set up</h2><span class="muted small">${setupDone} of ${setupReq.length} done</span></div>
+    <div class="prog"><i style="width:${pct(setupDone/setupReq.length)}%"></i></div><ol class="steps">${setup.map((x,k)=>li(x,k+1)).join('')}</ol>
+    <button class="btn sm" data-goto="help">See the whole guide</button></div>`;
+  else if(cur) box.innerHTML=`<div class="banner good"><div class="row spread"><span><b>Setup done.</b> Next: ${esc(cur.title.toLowerCase())}. <span class="muted small">${esc(cur.status)}</span></span><button class="btn sm" data-goto="help">Guide</button></div></div>`;
+  else box.innerHTML='';
+
+  // Guide tab visuals
+  const snd=S.inboxes.filter(i=>i.role==='sender'), bestDay=S.totals.sentEver?Math.max(0,...snd.map(i=>i.day||0)):0, N=s.coldMinWarmDays;
+  $('#flowWhen').textContent=`Every ${s.tickMinutes} minutes from ${s.startHour}:00 to ${s.endHour}:00 (${s.timezone}), with less on weekends.`;
+  const capDay=Math.max(1,Math.ceil((s.rampCap-s.rampStart)/s.rampPerDay)+1);
+  const marks=[[1,`${ramp(1)} emails a day per inbox`],[7,`${ramp(7)} a day`],[N,`Campaigns can start if placement holds at ${s.coldMinPlacement}% or more`],[capDay,`Full volume: ${s.rampCap} a day`]]
+    .sort((a,b)=>a[0]-b[0]).filter((m,k,a)=>!k||m[0]!==a[k-1][0]);
+  const nowIdx=bestDay?marks.findIndex(m=>m[0]>bestDay):-1;
+  $('#planTl').innerHTML=marks.map(([d,txt],k)=>`<div class="${bestDay>=d?'past':k===nowIdx?'now':''}"><div class="d">Day ${d}</div>${txt}${k===nowIdx?`<div class="muted small">Next. You're on day ${bestDay}</div>`:''}</div>`).join('');
+}
+
+document.addEventListener('click',async e=>{
+  const h=e.target.closest('.stp .sh');
+  if(h){const id=h.closest('.stp').dataset.step;guideOpen.has(id)?guideOpen.delete(id):guideOpen.add(id);
+    $$(`.stp[data-step="${id}"]`).forEach(x=>{x.classList.toggle('open',guideOpen.has(id));x.querySelector('.sh').setAttribute('aria-expanded',guideOpen.has(id));});return;}
+  const g=e.target.closest('[data-g]'); if(!g||g.disabled)return;
+  const act=g.dataset.g;
+  if(act==='bulk')return $('#bulkBtn').click();
+  if(act==='add')return openInbox(null);
+  if(act==='dns')return $('#dnsBtn').click();
+  if(act==='start')return $('#toggleBtn').click();
+  if(act==='run')return $('#runBtn').click();
+  if(act==='dkimyes'||act==='dkimno'){g.disabled=true;
+    try{await api('/api/settings',{method:'PUT',body:{dkimConfirmed:act==='dkimyes'}});toast(act==='dkimyes'?'Marked done. It confirms itself once signed warm-up mail arrives.':'Unmarked.');}catch(err){toast(err.message);}
+    return load(false);}
+  if(act==='testall'){
+    const list=S.inboxes.filter(i=>i.hasPassword&&i.login!=='ok'), bad=[]; g.disabled=true;
+    for(const [k,i] of list.entries()){g.textContent=`Testing ${k+1} of ${list.length}...`;
+      try{const r=await api(`/api/inboxes/${i.id}/test`,{method:'POST'});if(r.smtp!=='ok'||r.imap!=='ok')bad.push(i.email);}catch(err){bad.push(i.email);}}
+    toast(bad.length?`${bad.length} of ${list.length} failed: ${bad.join(', ')}. The step lists what to check.`:`All ${list.length} logins work.`,bad.length?10000:4000);
+    return load(false);}
+});
 
 // Activity
 function renderEvents(){
@@ -681,11 +889,21 @@ function renderCampList(){
   $('#coldEligibility').innerHTML=`<h2>Which inboxes can send campaigns</h2><p class="muted small">Rules: at least ${L.cold.minWarmDays} warm-up days, ${L.cold.minPlacement}% or more inbox placement, and at most ${L.cold.dailyCap} campaign emails per inbox per day. You can change these in Settings.</p>`+
     (el.length?`<div class="scroll"><table>${el.map(i=>`<tr><td>${esc(i.email)}</td><td>${i.ok?'<span class="pill good">Ready</span>':`<span class="pill warn">Not yet</span> <span class="muted small">${esc(i.reason)}</span>`}</td></tr>`).join('')}</table></div>`:'<p class="muted">Add sender inboxes first.</p>');
   $('#campCards').innerHTML=L.campaigns.length?L.campaigns.map(c=>{const st=c.stats;return `<div class="card" style="margin:0;cursor:pointer" data-camp="${c.id}">
-    <div class="row spread"><h3>${esc(c.name)}</h3>${campPill(c.status)}</div>
+    <div class="row spread"><h3>${esc(c.name)}</h3>${campPill(c)}</div>
     <div class="kv" style="margin-top:10px"><dt>Leads</dt><dd>${st.total}${st.counts.review?` <span class="pill warn">${st.counts.review} to review</span>`:''}</dd><dt>Sent</dt><dd>${st.sent}</dd>
     <dt>Replied</dt><dd>${st.replied}${st.replyRate!=null?` (${st.replyRate}%)`:''}</dd><dt>Bounced</dt><dd>${st.bounced}</dd></div></div>`;}).join(''):'<div class="card muted">No campaigns yet.</div>';
 }
-const campPill=st=>`<span class="pill ${st==='active'?'good':st==='paused'?'warn':''}">${st==='active'?'Sending':st==='paused'?'Paused':'Draft'}</span>`;
+// [pill class, short label, longer explanation]: an active campaign only says "Sending" when it can.
+function campState(c){
+  if(c.status!=='active')return c.status==='paused'?['warn','Paused','']:['','Draft','Nothing sends until you press Start sending.'];
+  const ready=(C.list?.eligibility||[]).filter(i=>c.sender_ids.includes(i.id)&&i.ok).length;
+  if(S.settings.paused)return ['warn','Waiting: mailer paused','This campaign is on, but the whole mailer is paused. Press Start warm-up at the top to let it send.'];
+  if(!c.sender_ids.length)return ['warn','Waiting: no inboxes picked','Pick the inboxes to send from under Schedule & inboxes.'];
+  if(!ready)return ['warn','Waiting: no inbox ready',`None of its inboxes can send campaigns yet. The Campaigns list shows why for each (warm-up days, placement, DNS).`];
+  if(!c.stats.counts.queued)return c.stats.counts.review?['warn','Waiting for your review',`${c.stats.counts.review} leads are waiting in review. Approve them under Leads.`]:['info','On, no leads to send','Add leads under Add leads, or connect PitchPersona with the link there.'];
+  return ['good','Sending',''];
+}
+const campPill=c=>{const [cls,label]=campState(c);return `<span class="pill ${cls}">${label}</span>`;};
 $('#campCards').addEventListener('click',e=>{const c=e.target.closest('[data-camp]');if(c)openCampaign(Number(c.dataset.camp));});
 $('#campBack').onclick=()=>{C.cur=null;C.selected.clear();loadCampaigns();};
 
@@ -699,7 +917,8 @@ async function openCampaign(id,keepSub){
   try{C.cur=await api('/api/campaigns/'+id);}catch(e){toast(e.message);return;}
   $('#campList').classList.add('hidden');$('#campView').classList.remove('hidden');
   const c=C.cur, st=c.stats;
-  $('#campTitle').textContent=c.name; $('#campStatus').outerHTML=`<span id="campStatus">${campPill(c.status)}</span>`;
+  $('#campTitle').textContent=c.name; $('#campStatus').outerHTML=`<span id="campStatus">${campPill(c)}</span>`;
+  const why=campState(c)[2];$('#campHint').classList.toggle('hidden',!why);$('#campHint').textContent=why;
   $('#campToggle').textContent=c.status==='active'?'Pause':'Start sending'; $('#campToggle').className='btn big '+(c.status==='active'?'':'primary');
   $('#campTiles').innerHTML=[['Leads',st.total,`${st.counts.review} to review · ${st.counts.queued} scheduled`],['Sent',st.sent,`${st.contacted} ${st.contacted===1?'person':'people'} contacted`],
     ['Replied',st.replied,st.replyRate!=null?st.replyRate+'% reply rate':'No sends yet'],['Bounced',st.bounced,st.attempted?Math.round(100*st.bounced/st.attempted)+'% of emailed':'–'],
@@ -716,7 +935,9 @@ $('#campToggle').onclick=async()=>{const c=C.cur;const starting=c.status!=='acti
   if(starting){const ready=C.list.eligibility.filter(i=>c.sender_ids.includes(i.id)&&i.ok).length;
     if(!ready&&!confirm('None of this campaign\'s inboxes is ready for cold email yet, so nothing will send until one is. Start anyway?'))return;
     if(c.stats.counts.review&&!confirm(`${c.stats.counts.review} leads are still waiting for review and won't be sent until you approve them. Start?`))return;}
-  try{await api(`/api/campaigns/${c.id}/status`,{method:'POST',body:{status:starting?'active':'paused'}});toast(starting?'Campaign started':'Campaign paused');}catch(e){toast(e.message);} openCampaign(c.id,true);};
+  try{await api(`/api/campaigns/${c.id}/status`,{method:'POST',body:{status:starting?'active':'paused'}});
+    toast(!starting?'Campaign paused':S.settings.paused?'Campaign on. It sends once you press Start warm-up at the top.':!c.stats.total?'Campaign on. Add leads to give it something to send.':'Campaign started');}
+  catch(e){toast(e.message,8000);} openCampaign(c.id,true);};
 $('#campArchive').onclick=async()=>{if(!confirm(`Archive "${C.cur.name}"? Unsent leads are skipped. Sent history stays.`))return;await api('/api/campaigns/'+C.cur.id,{method:'DELETE'});C.cur=null;loadCampaigns();};
 $('#campTestBtn').onclick=async()=>{const own=S.inboxes.map(i=>i.email);const to=prompt('Send step 1 as a test to which of your inboxes?\n'+own.join('\n'),own[0]||'');if(!to)return;
   try{const r=await api(`/api/campaigns/${C.cur.id}/test`,{method:'POST',body:{to:to.trim()}});toast(`Test sent from ${r.from} to ${r.to}`);}catch(e){toast(e.message);}};

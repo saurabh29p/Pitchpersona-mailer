@@ -42,11 +42,14 @@ Railway builds from the `Dockerfile` (Node 22) and health-checks `/health`.
 
 ## 3. Set it up in the panel
 
+The panel walks you through this. Overview shows a **Get set up** checklist until warm-up is running, and the **Guide** tab has the full checklist plus how a cycle works, the warm-up plan and what each colour means. Each step ticks itself off from what the mailer can see: a volume, inboxes, passing login tests, DNS, DKIM signing on received mail, and sending. **Start warm-up** refuses, and says why, until there are at least two inboxes with a sender among them and an app password saved. An inbox's day 1 is the day you press Start, unless you picked its day 1 yourself.
+
 1. In **Inboxes**, click **Add several** and paste one line per inbox: `email, app password, name`. App passwords come from Google Account, then Security, then 2-Step Verification, then App passwords.
 2. Optionally, add one or two **seed** inboxes at other providers, such as a personal Gmail or Outlook. They receive and reply, so your mail isn't only going Google to Google.
 3. Click **Test login** on each inbox.
 4. In **Settings**, then **AI writer**, paste your OpenRouter key, pick a model and click **Write a test email**.
-5. In **Overview**, wait until both domains say **Ready to send**, then press **Start warm-up**.
+5. In Google Admin, open Apps, Google Workspace, Gmail, **Authenticate email**, and click **Start authentication** for each domain. Until then Google signs with its default key and your DKIM record goes unused. The panel confirms it from the headers of received warm-up mail.
+6. In **Overview**, wait until both domains say **Ready to send**, then press **Start warm-up**.
 
 ## Ramp
 
@@ -85,4 +88,4 @@ npm run dry                                       # one cycle, nothing sent
 npm test                                          # the full test suite, nothing leaves your machine
 ```
 
-`npm test` runs three files in `test/`: reply, bounce and opt-out detection against a fake mailbox; an end-to-end pass in dry-run mode (sign-in, inboxes, PitchPersona webhook ingest, review, sequences and threading, pauses, inbox removal, unsubscribe and click links); and a real sending pass against local mock SMTP, IMAP and OpenRouter servers (needs `openssl`). Run it after any change before deploying.
+`npm test` runs five files in `test/`: reply, bounce and opt-out detection against a fake mailbox; deployment guards; the start guards and setup-guide facts; an end-to-end pass in dry-run mode (sign-in, inboxes, PitchPersona webhook ingest, review, sequences and threading, pauses, inbox removal, unsubscribe and click links); and a real sending pass against local mock SMTP, IMAP and OpenRouter servers (needs `openssl`). Run it after any change before deploying.

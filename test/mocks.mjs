@@ -33,7 +33,12 @@ export async function startMocks({ key, cert }) {
         const raw = Buffer.concat(chunks).toString("utf8");
         if (session.envelope.rcptTo.some((r) => /^spamtrap/.test(r.address))) return cb(Object.assign(new Error("5.7.1 Message rejected as spam"), { responseCode: 550 }));
         received.push({ from: session.envelope.mailFrom.address, to: session.envelope.rcptTo.map((r) => r.address), raw });
-        for (const r of session.envelope.rcptTo) { const b = box(r.address).INBOX; b.msgs.push({ uid: b.next++, raw }); }
+        // Like Gmail, the receiving side records a DKIM verdict. Domains with "nodkim" in them are
+        // signed with Google's default key, as before Start authentication is clicked.
+        const dom = session.envelope.mailFrom.address.split("@")[1];
+        const signer = /nodkim/.test(dom) ? `${dom.replace(/\./g, "-")}.20230601.gappssmtp.com` : dom;
+        const stored = `Authentication-Results: mock.test;\r\n       dkim=pass header.i=@${signer} header.s=google;\r\n       spf=pass smtp.mailfrom=${session.envelope.mailFrom.address}\r\n${raw}`;
+        for (const r of session.envelope.rcptTo) { const b = box(r.address).INBOX; b.msgs.push({ uid: b.next++, raw: stored }); }
         cb();
       });
     },
@@ -83,7 +88,7 @@ export async function startMocks({ key, cert }) {
             const hf = /BODY\.PEEK\[HEADER\.FIELDS \(([^)]*)\)\]/i.exec(items);
             if (hf) {
               const want = hf[1].split(/\s+/).map((w) => w.toUpperCase() + ":");
-              const lines = m.raw.split(/\r?\n\r?\n/)[0].split(/\r?\n/).filter((l) => want.some((w) => l.toUpperCase().startsWith(w)));
+              const lines = m.raw.split(/\r?\n\r?\n/)[0].split(/\r?\n(?![ \t])/).filter((l) => want.some((w) => l.toUpperCase().startsWith(w)));
               parts.push(`BODY[HEADER.FIELDS (${hf[1]})] ${lit(lines.join("\r\n") + "\r\n\r\n")}`);
             }
             const part = /BODY\.PEEK\[\]<(\d+)\.(\d+)>/i.exec(items);

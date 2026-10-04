@@ -34,6 +34,8 @@ ok(t1.body.smtp === "ok" && t1.body.imap === "ok", "Test login passes for a good
 const W = (await mk("w@getpitchpersona.test", "sender", "wrong-password")).body.id;
 const t2 = await api(`/api/inboxes/${W}/test`, "POST", {});
 ok(t2.body.smtp !== "ok" && t2.body.imap !== "ok", "Test login reports a wrong password on both", JSON.stringify(t2.body).slice(0, 160));
+const logins = Object.fromEntries((await api("/api/state")).body.inboxes.map((i) => [i.id, i.login]));
+ok(logins[A] === "ok" && logins[W] === "failed" && logins[S] === null, "the panel shows each login as works, failed or not tested", JSON.stringify(logins));
 await api(`/api/inboxes/${W}`, "DELETE");
 
 const ai = await api("/api/ai-test", "POST", {});
@@ -72,6 +74,8 @@ const warm = (await received()).find((m) => m.to.includes("seed@seedmail.test"))
 ok(!!warm && /Q4 planning doc/.test(warm.raw) && !/www\.example\.com/.test(warm.raw), "warm-up email written by the AI, sent, links stripped");
 
 backdate(); await runNow();
+const dom = (await api("/api/state")).body.domains.find((d) => d.domain === "getpitchpersona.test");
+ok(dom?.signing?.result === "pass", "DKIM signing is read from the headers of a received warm-up email", JSON.stringify(dom?.signing));
 let L = Object.fromEntries(db.prepare("SELECT email, status, attempts, error FROM leads").all().map((r) => [r.email, r]));
 ok(L["ghost@example.com"].status === "bounced", "address rejected at send time marked bounced", JSON.stringify(L["ghost@example.com"]));
 ok(!!db.prepare("SELECT 1 FROM suppression WHERE email='ghost@example.com'").get(), "rejected address suppressed");
@@ -97,6 +101,7 @@ ok(rep?.kind === "reply" && rep.snippet === "Sounds good, call me Tuesday.", "re
 await api(`/api/inboxes/${S}`, "PUT", { password: "wrong-password" });
 await runNow();
 ok(/rejected the app password/.test(db.prepare("SELECT pause_reason FROM inboxes WHERE id=?").get(S).pause_reason || ""), "rejected IMAP password pauses the inbox");
+ok((await api("/api/state")).body.inboxes.find((i) => i.id === S).login === "failed", "...and marks its login as failed");
 const before = (await commands()).filter((c) => /^LOGIN/.test(c)).length;
 await runNow();
 const afterN = (await commands()).filter((c) => /^LOGIN/.test(c)).length;
@@ -104,6 +109,7 @@ const others = db.prepare("SELECT COUNT(*) c FROM inboxes WHERE password_enc != 
 ok(afterN - before === others, "no further login attempts with the rejected password", `${afterN - before} logins, ${others} other inboxes`);
 await api(`/api/inboxes/${S}`, "PUT", { password: "good-pass" });
 ok(/New app password saved/.test(db.prepare("SELECT pause_reason FROM inboxes WHERE id=?").get(S).pause_reason), "saving a new password lets it try again");
+ok((await api("/api/state")).body.inboxes.find((i) => i.id === S).login === null, "a new password resets the login to not tested");
 
 const errs = db.prepare("SELECT at, inbox, message FROM events WHERE level='error'").all();
 console.log("error events:", errs.map((e) => `${e.inbox}: ${e.message}`));

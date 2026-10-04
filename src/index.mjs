@@ -23,6 +23,7 @@ import { DatabaseSync } from "node:sqlite";
 import nodemailer from "nodemailer";
 import { ImapFlow } from "imapflow";
 import { createCampaigns } from "./campaigns.mjs";
+import { dkimVerdict } from "./dkim.mjs";
 
 const DRY = process.env.DRY_RUN === "1";
 const ONCE = process.argv.includes("--once");
@@ -53,9 +54,12 @@ CREATE TABLE IF NOT EXISTS seen (
 CREATE TABLE IF NOT EXISTS reply_queue (message_id TEXT PRIMARY KEY, due_at TEXT, done INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS events (at TEXT, level TEXT, inbox TEXT, message TEXT);
 CREATE TABLE IF NOT EXISTS dns_checks (domain TEXT PRIMARY KEY, result TEXT, checked_at TEXT);
+CREATE TABLE IF NOT EXISTS dkim_seen (domain TEXT PRIMARY KEY, result TEXT, via TEXT, at TEXT);
 CREATE INDEX IF NOT EXISTS sent_sender_day ON sent(sender, day);
 CREATE INDEX IF NOT EXISTS events_at ON events(at);
 `);
+// The last Test login result: 1 passed, 0 failed, NULL not tested since the password was saved.
+for (const col of ["login_ok INTEGER", "login_at TEXT"]) { try { db.exec(`ALTER TABLE inboxes ADD COLUMN ${col}`); } catch { /* already there */ } }
 
 // ── Settings ────────────────────────────────────────────────────────────────────
 // Every number has a hard range. Values outside it are clamped on save, so a typo can't
@@ -79,6 +83,7 @@ const SETTINGS = {
   slowdownBelow:     { def: 85,   min: 50,  max: 100 },   // placement %: halve volume below this
   autoPauseBelow:    { def: 70,   min: 30,  max: 95 },    // placement %: pause the inbox below this
   requireDns:        { def: true },
+  dkimConfirmed:     { def: false },   // the user says they clicked Start authentication in Google Admin
   coldMinWarmDays:   { def: 14,   min: 7,   max: 60 },    // an inbox sends cold email only after this many warm-up days
   coldMinPlacement:  { def: 90,   min: 75,  max: 100 },   // ...and only while 7-day placement is at least this
   coldDailyCap:      { def: 30,   min: 1,   max: 50 },    // cold emails per inbox per day, across all campaigns
@@ -188,6 +193,7 @@ function saveInbox(input, id) {
   };
   if (!row.smtp_host || !row.imap_host) throw new Error("SMTP and IMAP hosts are required for a custom provider");
   const password_enc = input.password ? encrypt(String(input.password).replace(/\s+/g, "")) : cur?.password_enc || "";
+  if (cur && input.password) db.prepare("UPDATE inboxes SET login_ok = NULL, login_at = NULL WHERE id = ?").run(cur.id);
   if (cur && input.password && String(cur.pause_reason || "").startsWith(AUTH_PAUSE))
     db.prepare("UPDATE inboxes SET pause_reason = ? WHERE id = ?").run("New app password saved. Press Resume to start again.", cur.id);
   if (cur) {
@@ -431,6 +437,26 @@ async function blockedReason(s, inbox) {
   return null;
 }
 
+// Day 1 of the ramp is the first day an inbox can send, not the day it was added. An inbox added
+// days before Start would otherwise begin at a later day's volume. A hand-picked day 1 is kept.
+function rampFromToday() {
+  const tz = getSettings().timezone, today = localParts(new Date(), tz).day;
+  const moved = listInboxes().filter((i) => i.role === "sender" && i.start_date < today && i.created_at
+    && i.start_date === localParts(new Date(i.created_at), tz).day && !db.prepare("SELECT 1 FROM sent WHERE sender = ? LIMIT 1").get(i.email));
+  for (const i of moved) db.prepare("UPDATE inboxes SET start_date = ? WHERE id = ?").run(today, i.id);
+  if (moved.length) event("info", null, `Warm-up day 1 set to today for ${moved.length} inbox${moved.length > 1 ? "es" : ""} that hadn't sent yet`);
+}
+
+// Why the mailer can't do anything yet, in words the panel shows as is; null when it can start.
+function startBlock(all = listInboxes()) {
+  const senders = all.filter((i) => i.role === "sender");
+  if (!all.length) return "Add your inboxes first. Warm-up sends emails between your own inboxes, so it needs at least two.";
+  if (!senders.length) return "Add at least one sending inbox. Seeds only receive and reply.";
+  if (all.length < 2) return "Add at least one more inbox. Warm-up sends between your own inboxes, so a single inbox has no one to write to.";
+  if (!DRY && !senders.some((i) => i.password_enc)) return "Save an app password for at least one sending inbox.";
+  return null;
+}
+
 async function sendPhase(s, pool, force) {
   const now = localParts(new Date(), s.timezone);
   if (!DRY && !force && !inWindow(s, now)) return;
@@ -491,11 +517,15 @@ async function readInbox(s, inbox, pool) {
         const uids = await client.search(query, { uid: true });
         if (!uids || !uids.length) continue;
         // Fetch everything first: imapflow can't run other commands inside a fetch loop.
-        const msgs = await client.fetchAll(uids, { uid: true, envelope: true }, { uid: true });
+        const msgs = await client.fetchAll(uids, { uid: true, envelope: true, headers: ["authentication-results", "dkim-signature"] }, { uid: true });
         for (const msg of msgs) {
           const id = msg.envelope?.messageId;
-          if (!id || !db.prepare("SELECT 1 FROM sent WHERE message_id = ?").get(id)) continue;   // only our own warm-up mail
+          const own = id && db.prepare("SELECT sender FROM sent WHERE message_id = ?").get(id);
+          if (!own) continue;   // only our own warm-up mail
           if (db.prepare("SELECT 1 FROM seen WHERE message_id = ?").get(id)) continue;
+          const dkim = dkimVerdict(msg.headers, domainOf(own.sender));
+          if (dkim) db.prepare("INSERT INTO dkim_seen VALUES (?,?,?,?) ON CONFLICT(domain) DO UPDATE SET result = excluded.result, via = excluded.via, at = excluded.at")
+            .run(domainOf(own.sender), dkim, inbox.email, new Date().toISOString());
           const inSpam = folder === junk;
           await client.messageFlagsAdd(msg.uid, ["\\Seen"], { uid: true });
           if (Math.random() < s.starRate) await client.messageFlagsAdd(msg.uid, ["\\Flagged"], { uid: true });
@@ -526,7 +556,7 @@ async function readPhase(s, pool) {
   await Promise.all(readable.map((inbox) =>
     readInbox(s, inbox, pool).then((ok) => { if (ok) scanned.add(inbox.id); }).catch((e) => {
       // A rejected login won't fix itself; stop retrying a bad password every few minutes.
-      if (isAuthError(e)) pauseInbox(inbox, `${AUTH_PAUSE}. Save a new one, then resume.`);
+      if (isAuthError(e)) { pauseInbox(inbox, `${AUTH_PAUSE}. Save a new one, then resume.`); db.prepare("UPDATE inboxes SET login_ok = 0, login_at = ? WHERE id = ?").run(new Date().toISOString(), inbox.id); }
       else event("error", inbox.email, `Reading the inbox failed: ${imapError(e)}`);
     })));
   return scanned;
@@ -595,6 +625,8 @@ export async function overview() {
       id: i.id, email: i.email, name: i.name, role: i.role, provider: i.provider, smtp_host: i.smtp_host, smtp_port: i.smtp_port,
       imap_host: i.imap_host, imap_port: i.imap_port, dkim_selector: i.dkim_selector, start_date: i.start_date, cap: i.cap,
       paused: !!i.paused, pause_reason: i.pause_reason, hasPassword: !!i.password_enc, day: dayN, targetToday: target, slowed,
+      login: i.login_ok == null ? null : i.login_ok ? "ok" : "failed", loginAt: i.login_at,
+      coldOk: i.role === "sender" ? (await camp.coldStatus(s, i)).ok : false,
       sentToday: db.prepare("SELECT COUNT(*) c FROM sent WHERE sender = ? AND day = ?").get(i.email, today).c,
       sent7d: db.prepare("SELECT COUNT(*) c FROM sent WHERE sender = ? AND day >= ?").get(i.email, since7).c,
       received7d: db.prepare("SELECT COUNT(*) c FROM seen WHERE recipient = ? AND day >= ?").get(i.email, since7).c,
@@ -609,15 +641,21 @@ export async function overview() {
   const seenBy = Object.fromEntries(db.prepare("SELECT day, SUM(folder='inbox') i, SUM(folder='spam') sp FROM seen WHERE day >= ? GROUP BY day").all(since30).map((r) => [r.day, r]));
   const daily = days.map((d) => ({ day: d, sent: sentBy[d]?.c || 0, replies: sentBy[d]?.r || 0, inbox: seenBy[d]?.i || 0, spam: seenBy[d]?.sp || 0 }));
   const domains = [];
-  for (const d of [...new Set(listInboxes().filter((i) => i.role === "sender").map((i) => domainOf(i.email)))]) domains.push(await checkDomain(d));
+  for (const d of [...new Set(listInboxes().filter((i) => i.role === "sender").map((i) => domainOf(i.email)))])
+    domains.push({ ...(await checkDomain(d)), signing: db.prepare("SELECT result, via, at FROM dkim_seen WHERE domain = ?").get(d) || null });
   const tot7 = daily.slice(-7).reduce((a, d) => ({ inbox: a.inbox + d.inbox, spam: a.spam + d.spam, sent: a.sent + d.sent }), { inbox: 0, spam: 0, sent: 0 });
   const { openrouterKeyEnc, ...pub } = s;
+  const readiness = { startBlock: startBlock(), senders: inboxes.filter((i) => i.role === "sender").length,
+    readySenders: inboxes.filter((i) => i.role === "sender" && !i.blocked).length };
   return {
+    readiness,
     now: new Date().toISOString(), today, dry: DRY, storage: { persistent: PERSISTENT, dataDir: DATA_DIR }, settings: { ...pub, aiKeySet: !!openrouterKey(s), aiKeyFromEnv: !openrouterKeyEnc && !!process.env.OPENROUTER_API_KEY },
     limits: Object.fromEntries(Object.entries(SETTINGS).filter(([, v]) => typeof v.def === "number").map(([k, v]) => [k, [v.min, v.max]])),
     scheduler: { running: state.running, lastTickAt: state.lastTickAt, nextTickAt: state.nextTickAt, inWindow: inWindow(s, localParts(new Date(), s.timezone)) },
     totals: { sentToday: daily.at(-1).sent, repliesToday: daily.at(-1).replies, sent7d: tot7.sent, placement7d: tot7.inbox + tot7.spam ? Math.round((100 * tot7.inbox) / (tot7.inbox + tot7.spam)) : null, rescued7d: tot7.spam,
-      queued: db.prepare("SELECT COUNT(*) c FROM reply_queue WHERE done = 0").get().c },
+      queued: db.prepare("SELECT COUNT(*) c FROM reply_queue WHERE done = 0").get().c,
+      sentEver: db.prepare("SELECT COUNT(*) c FROM sent").get().c, seenEver: db.prepare("SELECT COUNT(*) c FROM seen").get().c },
+    campaigns: db.prepare("SELECT COUNT(*) count, COALESCE(SUM(status = 'active'), 0) active FROM campaigns").get(),
     inboxes, daily, domains, providers: PROVIDERS,
     events: db.prepare("SELECT * FROM events ORDER BY at DESC LIMIT 80").all(),
   };
@@ -669,6 +707,7 @@ async function testInbox(i) {
   const out = { smtp: null, imap: null };
   try { transports.delete(i.email); await transport(i).verify(); out.smtp = "ok"; } catch (e) { out.smtp = String(e.message).slice(0, 200); }
   try { await withImap(i, async (c) => { await c.list(); }); out.imap = "ok"; } catch (e) { out.imap = imapError(e); }
+  db.prepare("UPDATE inboxes SET login_ok = ?, login_at = ? WHERE id = ?").run(out.smtp === "ok" && out.imap === "ok" ? 1 : 0, new Date().toISOString(), i.id);
   event(out.smtp === "ok" && out.imap === "ok" ? "info" : "error", i.email, `Login test: SMTP ${out.smtp === "ok" ? "ok" : "failed"}, IMAP ${out.imap === "ok" ? "ok" : "failed"}`);
   return out;
 }
@@ -698,12 +737,16 @@ async function api(req, res, url) {
   if (p === "/api/settings" && m === "PUT") { saveSettings(await readJson(req)); schedule(); event("info", null, "Settings saved"); return reply(200, { ok: true }); }
   if (p === "/api/pause" && m === "POST") {
     const { paused } = await readJson(req);
+    const why = paused ? null : startBlock();
+    if (why) return reply(400, { error: why, code: "not_ready" });
     saveSettings({ paused: !!paused }); event("info", null, paused ? "Warm-up paused" : "Warm-up started");
-    if (!paused) tick().catch((e) => event("error", null, e.message));
+    if (!paused) { rampFromToday(); tick().catch((e) => event("error", null, e.message)); }
     return reply(200, { ok: true });
   }
   if (p === "/api/run-now" && m === "POST") {
-    if (getSettings().paused) return reply(400, { error: "Start the warm-up first" });
+    if (getSettings().paused) return reply(400, { error: "Press Start warm-up first" });
+    const why = startBlock();
+    if (why) return reply(400, { error: why, code: "not_ready" });
     if (state.running) return reply(409, { error: "A cycle is already running. Check Activity in a minute." });
     tick({ force: true }).catch((e) => event("error", null, e.message));
     event("info", null, "Manual cycle started (ignores working hours, still respects every limit)");
@@ -745,7 +788,10 @@ async function api(req, res, url) {
       camp.inboxRemoved(i); event("info", i.email, "Inbox removed");
       return reply(200, { ok: true });
     }
-    if (im[2] === "/test" && m === "POST") return reply(200, await testInbox(i));
+    if (im[2] === "/test" && m === "POST") {
+      if (!i.password_enc && !DRY) return reply(400, { error: `Save an app password for ${i.email} first: press Edit, paste it, then Save.` });
+      return reply(200, await testInbox(i));
+    }
     if (im[2] === "/send-test" && m === "POST") {
       const s = getSettings(), pool = listInboxes();
       const why = await blockedReason(s, i);
