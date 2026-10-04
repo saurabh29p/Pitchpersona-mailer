@@ -426,6 +426,7 @@ function render(){
 
   // Safety banners
   const probs=[], senders=S.inboxes.filter(i=>i.role==='sender');
+  if(S.storage&&!S.storage.persistent) probs.push(['bad',`No Railway volume is mounted at <b>${esc(S.storage.dataDir)}</b>, so inboxes, passwords and history are erased on every deploy. Add a volume with that mount path.`]);
   if(!S.inboxes.length) probs.push(['warn','Add your inboxes in the Inboxes tab to begin.']);
   S.domains.filter(d=>!d.ok).forEach(d=>probs.push(['bad',`${esc(d.domain)} is missing ${['spf','dkim','dmarc'].filter(k=>!d[k]).map(k=>k.toUpperCase()).join(', ')}. ${s.requireDns?'Sending from it is blocked.':' <b>The DNS gate is off in Settings, so it can still send, and its mail will likely land in spam.</b>'}`]));
   S.inboxes.filter(i=>i.paused&&i.pause_reason).forEach(i=>probs.push(['bad',`${esc(i.email)} paused itself: ${esc(i.pause_reason)}`]));

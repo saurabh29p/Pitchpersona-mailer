@@ -2,7 +2,7 @@
 import { spawnSync } from "node:child_process";
 import { ROOT } from "./helpers.mjs";
 
-const files = ["scanner.test.mjs", "e2e.test.mjs", "live.test.mjs"];
+const files = ["scanner.test.mjs", "deploy.test.mjs", "e2e.test.mjs", "live.test.mjs"];
 let failed = 0;
 for (const f of files) {
   console.log(`\n── ${f}`);

@@ -33,6 +33,7 @@ Also give every inbox a profile photo and a plain signature, and add both domain
 ## 2. Deploy on Railway
 
 1. In Railway, create a **New Project**, choose **Deploy from GitHub repo**, and pick `pitchpersona-backend`. Under **Settings**, then **Source**, set **Root Directory** to `mailer` and the branch to the one this lives on.
+   Then, under **Settings**, then **Config-as-code**, set **Railway Config File** to `/mailer/railway.json`. Railway doesn't apply the Root Directory to this path, so without it the service uses the PitchPersona API's `/railway.toml` and fails with "The executable `python` could not be found". If a **Custom Start Command** is set under **Deploy**, clear it.
 2. Under **Settings**, then **Volumes**, add a volume mounted at `/data`. Keep **one replica**, because the database is a single SQLite file.
 3. Under **Variables**, set `PANEL_PASSWORD` to a long random password. `OPENROUTER_API_KEY` is optional because you can paste the key in the panel instead.
 4. Under **Settings**, then **Networking**, click **Generate Domain**. Open it and sign in.

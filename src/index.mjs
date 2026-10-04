@@ -28,6 +28,11 @@ const DRY = process.env.DRY_RUN === "1";
 const ONCE = process.argv.includes("--once");
 const DATA_DIR = process.env.DATA_DIR || "./data";
 fs.mkdirSync(DATA_DIR, { recursive: true });
+// On Railway, data survives a redeploy only on a mounted volume.
+const ON_RAILWAY = !!(process.env.RAILWAY_ENVIRONMENT_NAME || process.env.RAILWAY_ENVIRONMENT);
+const VOLUME = process.env.RAILWAY_VOLUME_MOUNT_PATH;
+const PERSISTENT = !ON_RAILWAY || (!!VOLUME && path.resolve(DATA_DIR).startsWith(path.resolve(VOLUME)));
+if (!PERSISTENT) console.warn(`No Railway volume is mounted at ${DATA_DIR}: inboxes and history will be erased on the next deploy.`);
 const db = new DatabaseSync(path.join(DATA_DIR, "warmup.db"));
 let camp = null;   // the campaign sender, wired up once every helper below exists
 const PANEL_HTML = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "panel.html"), "utf8");
@@ -608,7 +613,7 @@ export async function overview() {
   const tot7 = daily.slice(-7).reduce((a, d) => ({ inbox: a.inbox + d.inbox, spam: a.spam + d.spam, sent: a.sent + d.sent }), { inbox: 0, spam: 0, sent: 0 });
   const { openrouterKeyEnc, ...pub } = s;
   return {
-    now: new Date().toISOString(), today, dry: DRY, settings: { ...pub, aiKeySet: !!openrouterKey(s), aiKeyFromEnv: !openrouterKeyEnc && !!process.env.OPENROUTER_API_KEY },
+    now: new Date().toISOString(), today, dry: DRY, storage: { persistent: PERSISTENT, dataDir: DATA_DIR }, settings: { ...pub, aiKeySet: !!openrouterKey(s), aiKeyFromEnv: !openrouterKeyEnc && !!process.env.OPENROUTER_API_KEY },
     limits: Object.fromEntries(Object.entries(SETTINGS).filter(([, v]) => typeof v.def === "number").map(([k, v]) => [k, [v.min, v.max]])),
     scheduler: { running: state.running, lastTickAt: state.lastTickAt, nextTickAt: state.nextTickAt, inWindow: inWindow(s, localParts(new Date(), s.timezone)) },
     totals: { sentToday: daily.at(-1).sent, repliesToday: daily.at(-1).replies, sent7d: tot7.sent, placement7d: tot7.inbox + tot7.spam ? Math.round((100 * tot7.inbox) / (tot7.inbox + tot7.spam)) : null, rescued7d: tot7.spam,
@@ -674,9 +679,10 @@ async function api(req, res, url) {
   if (p === "/api/login" && m === "POST") {
     const ip = clientIp(req);
     if (rateLimited(ip)) return reply(429, { error: "Too many attempts. Wait 15 minutes." });
+    if (!PANEL_PASSWORD) return reply(503, { error: "The PANEL_PASSWORD variable isn't set. Add it under Variables in Railway, then deploy again." });
     const { password } = await readJson(req);
     const a = crypto.createHash("sha256").update(String(password || "")).digest(), b = crypto.createHash("sha256").update(PANEL_PASSWORD).digest();
-    if (!PANEL_PASSWORD || !crypto.timingSafeEqual(a, b)) { failedLogin(ip); return reply(401, { error: "Wrong password" }); }
+    if (!crypto.timingSafeEqual(a, b)) { failedLogin(ip); return reply(401, { error: "Wrong password" }); }
     const secure = req.headers["x-forwarded-proto"] === "https" ? "; Secure" : "";
     // Remember the public address for unsubscribe and tracking links.
     const host = String(req.headers["x-forwarded-host"] || req.headers.host || "");
