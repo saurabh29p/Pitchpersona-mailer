@@ -151,6 +151,8 @@ if (haveCert) {
     ok(/cap of 2 keeps it at 2/.test((await inbox(A)).capNote || ""), "an own cap below the ramp says it stops the inbox climbing", (await inbox(A)).capNote);
     await api(`/api/inboxes/${A}`, "PUT", { cap: null });
     ok((await inbox(A)).capNote === null, "...and clearing it removes the note");
+    st = (await api("/api/state")).body;
+    ok(st.totals.queued === 0 ? st.totals.nextReplyAt === null : Date.parse(st.totals.nextReplyAt) > 0, "the panel gets when the next queued reply is due", JSON.stringify(st.totals));
     db.prepare("INSERT OR REPLACE INTO reply_queue (message_id, due_at, done) SELECT message_id, ?, 0 FROM seen").run(new Date(Date.now() - 60000).toISOString());
     await runNow();
     const reply = G.sent.find((m) => m.inReplyTo);

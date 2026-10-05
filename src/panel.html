@@ -730,7 +730,7 @@ function render(){
     ['Warm-up sent today',t.sentToday,`${t.repliesToday} of them replies`],
     ['Inbox placement, 7 days',plc==null?'–':plc+'%',plc==null?'Not enough data yet':`<span class="pill ${plcCls}">${plc>=90?'Healthy':plc>=s.autoPauseBelow?'Watch':'At risk'}</span>`],
     ['Rescued from spam, 7 days',t.rescued7d,'Moved back to the inbox'],
-    ['Warm-up replies queued',t.queued,'Sent after a random delay'],
+    ['Warm-up replies queued',t.queued,t.nextReplyAt?(Date.parse(t.nextReplyAt)<=Date.now()?'Next one goes out in the next cycle':`Next one due around ${new Date(t.nextReplyAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`):'Sent after a random delay'],
   ].map(([l,v,sub])=>`<div class="card tile"><div class="lab">${l}</div><div class="val">${v}</div><div class="sub">${sub}</div></div>`).join('');
 
   barChart($('#chVolume'),S.daily.map(d=>({x:d.day,parts:[d.sent-d.replies,d.replies]})),['var(--s1)','var(--s2)'],['New','Replies']);
