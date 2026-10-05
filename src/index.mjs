@@ -972,6 +972,7 @@ export async function overview() {
     network: { onRailway: ON_RAILWAY, checking: NET_CHECK, results: reachNow().map(({ host, port, kind, ok, error, at }) => ({ host, port, kind, ok, error, at: new Date(at).toISOString() })) },
     totals: { sentToday: daily.at(-1).sent, repliesToday: daily.at(-1).replies, sent7d: tot7.sent, placement7d: tot7.inbox + tot7.spam ? Math.round((100 * tot7.inbox) / (tot7.inbox + tot7.spam)) : null, rescued7d: tot7.spam,
       queued: db.prepare("SELECT COUNT(*) c FROM reply_queue WHERE done = 0").get().c,
+      nextReplyAt: db.prepare("SELECT MIN(due_at) d FROM reply_queue WHERE done = 0").get().d || null,
       sentEver: db.prepare("SELECT COUNT(*) c FROM sent").get().c, seenEver: db.prepare("SELECT COUNT(*) c FROM seen").get().c },
     campaigns: db.prepare("SELECT COUNT(*) count, COALESCE(SUM(status = 'active'), 0) active FROM campaigns").get(),
     inboxes, daily, domains, providers: PROVIDERS,
