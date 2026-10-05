@@ -25,6 +25,13 @@ An internal, self-hosted replacement for Instantly or Smartlead: inbox warm-up p
 - **Busy mailboxes** are read 1,000 new messages per cycle. Campaign follow-ups from that inbox wait until it has caught up, so no reply is missed.
 - **Lead batches** over 1,000 are not dropped silently: the answer says how many to send again.
 - Activity older than 30 days and finished reply jobs older than 14 days are cleared every hour.
+- **A mail server it can't reach** (a closed port, or Railway's SMTP block) is found by a plain connection check at start, before each cycle and on every login test. The inboxes using it show as blocked with the reason instead of failing sends, and sends that fail on the connection don't count toward pausing the inbox. A failed check is repeated every 5 minutes.
+
+## Knowing what it's doing
+
+- **The bar under the tabs** says what the mailer is doing right now (the step a cycle is on), what the last cycle sent, why it sent nothing when it didn't (outside working hours, every inbox blocked, today's emails already sent, or nothing due yet), and when the next one runs. It says so when the panel can't reach the mailer, during a deploy for example, and reconnects by itself.
+- **Messages** in the corner confirm each action. Problems stay until you close them; good news fades. Start and Run a cycle now each end with a message saying what the cycle did.
+- **Every failed login has a reason and a fix**, worked out from what the mail server said: Railway blocking SMTP, a wrong or missing app password, IMAP turned off, a sign-in Google wants confirmed in a browser, too many attempts, a wrong server name, port or certificate. The server's own words are one tap away. A new app password is tested as soon as it's saved.
 
 ## 1. Fix DNS first (at your DNS host, for each domain)
 
@@ -40,6 +47,8 @@ getpitchpersona.com and trypitchpersona.com passed all three checks on 4 Oct 202
 Also give every inbox a profile photo and a plain signature, and add both domains to Google Postmaster Tools.
 
 ## 2. Deploy on Railway
+
+**Railway's Pro plan is required.** Railway blocks every email-sending (SMTP) connection on its Free, Trial and Hobby plans, so on Hobby every login test fails on sending with a timeout and nothing can be sent. Reading mail (IMAP, port 993) works on any plan. After upgrading, redeploy the service: Railway only opens the email ports on a new deploy. The mailer checks the connection to each mail server when it starts and every few minutes, says on Overview when it can't connect, and tests those logins again by itself once it can. See [Railway's outbound networking docs](https://docs.railway.com/reference/outbound-networking).
 
 1. In Railway, create a **New Project**, choose **Deploy from GitHub repo**, and pick `pitchpersona-mailer` on the `main` branch. Leave **Root Directory** empty. Railway reads `railway.json` from the repo root.
 2. Under **Settings**, then **Volumes**, add a volume mounted at `/data`. Keep **one replica**, because the database is a single SQLite file.
@@ -73,7 +82,7 @@ The panel walks you through this. Overview shows a **Get set up** checklist unti
 
 1. In **Inboxes**, click **Add several** and paste one line per inbox: `email, app password, name`. App passwords come from Google Account, then Security, then 2-Step Verification, then App passwords.
 2. Optionally, add one or two **seed** inboxes at other providers, such as a personal Gmail or Outlook. They receive and reply, so your mail isn't only going Google to Google.
-3. Click **Test login** on each inbox.
+3. Each inbox tests its login as soon as its app password is saved (or press **Test login**). A failure shows the reason and the fix on the inbox card and on Overview.
 4. In **Settings**, then **AI writer**, paste your OpenRouter key, pick a model and click **Write a test email**.
 5. In Google Admin, open Apps, Google Workspace, Gmail, **Authenticate email**, and click **Start authentication** for each domain. Until then Google signs with its default key and your DKIM record goes unused. The panel confirms it from the headers of received warm-up mail.
 6. In **Overview**, wait until both domains say **Ready to send**, then press **Start warm-up**.
@@ -115,4 +124,4 @@ npm run dry                                       # one cycle, nothing sent
 npm test                                          # the full test suite, nothing leaves your machine
 ```
 
-`npm test` runs six files in `test/`: reply, bounce and opt-out detection against a fake mailbox; deployment guards; the start guards and setup-guide facts; an end-to-end pass in dry-run mode (sign-in, inboxes, PitchPersona webhook ingest, review, sequences and threading, pauses, inbox removal, unsubscribe and click links); a real sending pass against local mock SMTP, IMAP and OpenRouter servers (needs `openssl`); and a stability pass (clean stop, restart mid-send, DNS failures, a mail server that stops answering, batched reading, lead search). Run it after any change before deploying.
+`npm test` runs seven files in `test/`: reply, bounce and opt-out detection against a fake mailbox; deployment guards; the start guards and setup-guide facts; an end-to-end pass in dry-run mode (sign-in, inboxes, PitchPersona webhook ingest, review, sequences and threading, pauses, inbox removal, unsubscribe and click links); a real sending pass against local mock SMTP, IMAP and OpenRouter servers (needs `openssl`); a stability pass (clean stop, restart mid-send, DNS failures, a mail server that stops answering, batched reading, lead search); and a feedback pass (plain-language reasons for real Gmail and Railway errors, a blocked sending port that blocks Start with the fix, logins re-tested once it connects or after a redeploy, and cycle summaries). Run it after any change before deploying.

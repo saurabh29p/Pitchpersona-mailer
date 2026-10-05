@@ -77,7 +77,38 @@ label.f input,label.f select,label.f textarea{background:var(--surface);border:1
 .mail.open pre{display:block}
 dialog{border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--text);padding:20px;width:min(640px,calc(100vw - 32px))}
 dialog::backdrop{background:rgba(0,0,0,.45)}
-.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--surface);padding:10px 16px;border-radius:10px;font-size:14px;display:none;z-index:20;max-width:calc(100vw - 32px)}
+/* Notifications: successes fade by themselves, problems stay until closed */
+#toasts{position:fixed;right:16px;bottom:16px;z-index:40;display:flex;flex-direction:column;gap:8px;width:min(400px,calc(100vw - 32px));pointer-events:none}
+.toast{pointer-events:auto;display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:4px 10px;align-items:start;background:var(--surface);color:var(--text);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:12px;padding:11px 12px;font-size:14px;box-shadow:0 12px 32px rgba(0,0,0,.35);animation:tin .18s ease-out}
+.toast.ok{border-left-color:var(--good)}.toast.error{border-left-color:var(--bad)}.toast.warn{border-left-color:var(--warn)}
+.toast .ic{font-weight:700;line-height:1.4}.toast.ok .ic{color:var(--good-text)}.toast.error .ic{color:var(--bad-text)}.toast.warn .ic{color:var(--warn-text)}.toast.info .ic{color:var(--accent-text)}
+.toast .tt{font-weight:600}.toast .tb{color:var(--text-2);font-size:13px;margin-top:2px;overflow-wrap:anywhere}
+.toast .x{border:0;background:none;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
+.toast .ta{grid-column:2/-1;display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (max-width:640px){#toasts{right:16px;left:16px;width:auto}}
+/* Work in progress: a spinner, a busy button, and a thin bar while the panel waits on the server */
+.spin{width:14px;height:14px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;display:inline-block;animation:sp .8s linear infinite;flex:none;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.btn.busy{opacity:.85;cursor:progress;display:inline-flex;align-items:center;gap:8px}
+#topload{position:fixed;top:0;left:0;height:3px;width:100%;z-index:50;background:linear-gradient(90deg,transparent,var(--accent),transparent);background-size:40% 100%;background-repeat:no-repeat;animation:tl 1.1s linear infinite;opacity:0;transition:opacity .2s;pointer-events:none}
+#topload.on{opacity:1}@keyframes tl{from{background-position:-40% 0}to{background-position:140% 0}}
+/* The status bar: what the mailer is doing right now */
+.sbar{max-width:1100px;margin:0 auto;padding:8px 16px 10px}.sbar:empty{display:none}
+.sbar>div{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:8px 12px;font-size:14px}
+.sbar .si{flex:none;width:20px;text-align:center;font-weight:700}
+.sbar .stx{flex:1;min-width:200px}.sbar .stx .muted{font-size:13px}
+.sbar.bad>div{border-color:var(--bad)}.sbar.bad .si{color:var(--bad-text)}
+.sbar.warn>div{border-color:var(--warn)}.sbar.warn .si{color:var(--warn-text)}
+.sbar.good .si{color:var(--good-text)}.sbar.run>div{border-color:var(--accent)}.sbar.run .si{color:var(--accent-text)}
+/* Login test results on an inbox card */
+.lres{display:grid;gap:6px;font-size:13px}
+.lres .ln{display:grid;grid-template-columns:18px minmax(0,1fr);gap:2px 8px}
+.lres .ok{color:var(--good-text)}.lres .no{color:var(--bad-text)}
+.fixbox{grid-column:2;background:var(--surface-2);border-radius:8px;padding:8px 10px;color:var(--text-2)}
+.fixbox b{color:var(--text)}.fixbox details{margin-top:4px}.fixbox summary{cursor:pointer;color:var(--muted)}
+.fixbox code{word-break:break-all;white-space:normal}
+.banner li .row{margin-top:6px}
 #login{min-height:100vh;display:grid;place-items:center;padding:16px}
 #login .card{width:min(380px,100%)}
 .subnav{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line)}
@@ -112,6 +143,7 @@ a{color:var(--accent-text)}
 .sb .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .sb .note{font-size:13px;color:var(--muted);margin:6px 0 0}
 .sb .prob{color:var(--bad-text);font-size:13px;margin:6px 0 0}
+.issue{border-left:3px solid var(--bad);background:var(--surface);border-radius:6px;padding:8px 10px;margin:8px 0 0;font-size:13px;color:var(--text-2)}.issue b:first-child{color:var(--bad-text)}
 .opt{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:0 7px;margin-left:6px;vertical-align:2px}
 .rec{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;font-size:13px;margin:6px 0}.rec dt{color:var(--text-2)}.rec dd{margin:0;word-break:break-all}
 /* Help where it's needed: "?" popovers and a "How to use this page" dropdown per tab */
@@ -158,6 +190,7 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
   </form>
 </div>
 
+<div id="topload" aria-hidden="true"></div>
 <div id="app" class="hidden">
 <header>
   <div class="hrow">
@@ -176,6 +209,7 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
     <button role="tab" data-tab="settings" aria-selected="false">Settings</button>
     <button role="tab" data-tab="help" aria-selected="false">Guide</button>
   </nav>
+  <div class="sbar" id="sbar" role="status" aria-live="polite"></div>
 </header>
 
 <main class="wrap">
@@ -184,11 +218,12 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
   <!-- OVERVIEW -->
   <section data-panel="overview">
     <div id="guideBox"></div>
-    <details class="howto" data-howto="overview"><summary>How to use this page</summary><div class="in"><ol><li><b>The banner</b> at the top lists anything that needs you. Green means nothing does.</li>
+    <details class="howto" data-howto="overview"><summary>How to use this page</summary><div class="in"><ol><li><b>The bar under the tabs</b> says what the mailer is doing right now and what the last cycle did. It is on every page.</li>
+<li><b>The banner</b> at the top lists anything that needs you, with the reason and the fix. Green means nothing does.</li>
 <li><b>Tiles</b> show today's warm-up emails, inbox placement over 7 days (keep it at 90% or more), emails rescued from spam, and replies waiting to go out.</li>
 <li><b>Charts</b> show daily volume, and placement against the 90% safe line and the auto-pause line. Hover over a bar or point for the numbers.</li>
 <li><b>Inboxes today</b> shows each inbox's warm-up day, today's sends against its target, and placement.</li>
-<li><b>Domain authentication</b> shows SPF, DKIM and DMARC for each sending domain.</li></ol><div class="btnref"><span class="k">Start warm-up</span><span>Switches the mailer on. If something is missing it stays off and says what.</span><span class="k">Pause all</span><span>Stops all sending at once, campaigns included, even emails already queued in a running cycle.</span><span class="k">Run a cycle now</span><span>Runs one round straight away, even outside working hours. Every limit still applies.</span><span class="k">Re-check DNS</span><span>Reads your DNS again now, instead of waiting for the 6-hour refresh.</span></div></div></details>
+<li><b>Domain authentication</b> shows SPF, DKIM and DMARC for each sending domain.</li></ol><div class="btnref"><span class="k">Start warm-up</span><span>Switches the mailer on. If something is missing it stays off and says what.</span><span class="k">Pause all</span><span>Stops all sending at once, campaigns included, even emails already queued in a running cycle.</span><span class="k">Run a cycle now</span><span>Runs one round straight away, even outside working hours. Every limit still applies.</span><span class="k">Re-check DNS</span><span>Reads your DNS again now, instead of waiting for the 6-hour refresh.</span><span class="k">Re-check connection</span><span>Shown when this server can't reach a mail server. Tries again now instead of in 5 minutes.</span></div></div></details>
     <div class="grid g4" id="tiles"></div>
     <div class="grid g2">
       <div class="card"><h2>Emails per day</h2><div class="legend"><span><i style="background:var(--s1)"></i>New emails</span><span><i style="background:var(--s2)"></i>Replies</span></div><div class="chart" id="chVolume"></div></div>
@@ -202,8 +237,8 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
   <section data-panel="inboxes" class="hidden">
     <details class="howto" data-howto="inboxes"><summary>How to use this page</summary><div class="in"><ol><li>Create an app password for each inbox. The setup checklist on Overview has the steps and links.</li>
 <li>Press <b>Add several</b> and paste one line per inbox: <code>email, app password, name</code>.</li>
-<li>Press <b>Test login</b> on each inbox. Both sending and reading should pass.</li>
-<li>Optional: add one or two seeds at other providers.</li></ol><div class="btnref"><span class="k">Add several</span><span>Adds many inboxes at once, one line each. Each starts on day 1 of its own ramp.</span><span class="k">Add inbox</span><span>Adds one inbox. Under Server settings you can use a provider other than Google.</span><span class="k">Pause / Resume</span><span>Stops sending from this inbox only. It still reads its mail, so replies are caught.</span><span class="k">Test login</span><span>Signs in to send and to read, without sending anything.</span><span class="k">Send one now</span><span>Sends one real warm-up email to another of your inboxes. It counts toward today's limit.</span><span class="k">Edit</span><span>Changes the name, app password, daily cap or day 1. The address can't change.</span><span class="k">Remove</span><span>Deletes the inbox. Its history stays, and leads it was emailing wait in Review.</span></div></div></details>
+<li>Each inbox tests its login by itself when you save its app password. Both sending and reading should pass. If one fails, the card says why and what to do.</li>
+<li>Optional: add one or two seeds at other providers.</li></ol><div class="btnref"><span class="k">Add several</span><span>Adds many inboxes at once, one line each. Each starts on day 1 of its own ramp.</span><span class="k">Add inbox</span><span>Adds one inbox. Under Server settings you can use a provider other than Google.</span><span class="k">Pause / Resume</span><span>Stops sending from this inbox only. It still reads its mail, so replies are caught.</span><span class="k">Test login</span><span>Signs in to send and to read, without sending anything. The card then shows each result, and for a failure the reason and the fix.</span><span class="k">Send one now</span><span>Sends one real warm-up email to another of your inboxes. It counts toward today's limit.</span><span class="k">Edit</span><span>Changes the name, app password, daily cap or day 1. The address can't change.</span><span class="k">Remove</span><span>Deletes the inbox. Its history stays, and leads it was emailing wait in Review.</span></div></div></details>
     <div class="row spread" style="margin-bottom:12px"><p class="muted small" style="margin:0;flex:1;min-width:220px">Senders warm up on the ramp. Seeds are inboxes at other providers (a personal Gmail or Outlook). They only receive and reply, which shows how other providers treat your mail.</p><div class="row"><button type="button" class="qh" data-help="roles" aria-label="Senders and seeds" aria-expanded="false">?</button><button class="btn" id="bulkBtn">Add several</button><button class="btn primary" id="addInboxBtn">Add inbox</button></div></div>
     <div id="inboxCards" class="grid g2"></div>
   </section>
@@ -398,7 +433,7 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
       <span class="pill good">Warming up</span><span>All good. The inbox is sending on its ramp.</span>
       <span class="pill warn">Slowed down</span><span>Placement dipped below the slowdown line, so volume is halved until it recovers. Nothing to do.</span>
       <span class="pill warn">Paused</span><span>You paused it, or a safety rule did. The reason is shown on the inbox. Fix that first, then press Resume.</span>
-      <span class="pill bad">Blocked</span><span>It can't send: DNS is missing for its domain, or no app password is saved.</span>
+      <span class="pill bad">Blocked</span><span>It can't send: DNS is missing for its domain, no app password is saved, its last login test failed, or this server can't reach its mail server. The inbox card says which.</span>
       <span class="pill info">Seed</span><span>Receives and replies only. Used to see how outside providers treat your mail.</span>
     </div></div>
     <div class="card"><h2>Your daily two-minute check</h2><ol style="margin:0;padding-left:20px">
@@ -486,21 +521,49 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
   <label class="f full">Start from<select name="preset"><option value="pitchpersona">PitchPersona sequence (uses the emails PitchPersona wrote)</option><option value="blank">My own template</option></select></label></div>
   <div class="row" style="justify-content:flex-end;margin-top:12px"><button type="button" class="btn" id="newCampCancel">Cancel</button><button class="btn primary" value="save">Create</button></div></form></dialog>
 
-<div class="toast" id="toast"></div>
+<div id="toasts" aria-live="polite"></div>
 
 <script>
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let S=null, editing=null, tab='overview';
 
+// Every call to the server. A thin bar shows while one is waiting, and a lost connection
+// (a deploy restarting the mailer, say) says so in words instead of "Failed to fetch".
+let inflight=0, offline=false;
+function loading(d){inflight=Math.max(0,inflight+d);clearTimeout(loading.t);if(inflight)loading.t=setTimeout(()=>$('#topload').classList.toggle('on',inflight>0),150);else $('#topload').classList.remove('on');}
 async function api(path,opts={}){
-  const r=await fetch(path,{...opts,headers:{'content-type':'application/json'},body:opts.body?JSON.stringify(opts.body):undefined});
+  let r; loading(1);
+  try{r=await fetch(path,{...opts,headers:{'content-type':'application/json'},body:opts.body?JSON.stringify(opts.body):undefined});}
+  catch{offline=true;renderStatus();throw new Error("Can't reach the mailer right now. If you just deployed, it's restarting. This page reconnects by itself.");}
+  finally{loading(-1);}
+  if(offline){offline=false;toast('Connected to the mailer again');}
   const j=await r.json().catch(()=>({}));
   if(r.status===401&&path!=='/api/login'){showLogin();throw new Error('Signed out');}
-  if(!r.ok) throw new Error(j.error||('Error '+r.status));
+  if(r.status===502||r.status===503&&!j.error){offline=true;renderStatus();throw new Error("The mailer isn't answering right now. If you just deployed, it's starting up. This page reconnects by itself.");}
+  if(!r.ok) throw Object.assign(new Error(j.error||('Something went wrong (error '+r.status+')')),{body:j,status:r.status});
   return j;
 }
-function toast(m,ms){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',ms||(m.length>60?7000:3500));}
+// Notifications. toast() for good news (fades), fail() for problems (stays until closed).
+// Links in the text become clickable.
+const linkify=t=>esc(t).replace(/https?:\/\/[^\s<)"']+[^\s<)"'.,;:]/g,u=>`<a href="${u}" target="_blank" rel="noopener">${u.replace(/^https:\/\//,'')}</a>`);
+function notify({kind='ok',title,msg='',ms,actions=[]}){
+  const box=$('#toasts'), el=document.createElement('div');
+  el.className='toast '+kind; el.setAttribute('role',kind==='error'?'alert':'status');
+  el.innerHTML=`<span class="ic" aria-hidden="true">${{ok:'✓',error:'✗',warn:'!',info:'i'}[kind]||'i'}</span><div>${title?`<div class="tt">${esc(title)}</div>`:''}${msg?`<div class="tb">${linkify(msg)}</div>`:''}</div><button class="x" aria-label="Close">×</button>${actions.length?`<div class="ta">${actions.map((a,k)=>`<button class="btn sm" data-k="${k}">${esc(a.label)}</button>`).join('')}</div>`:''}`;
+  el.querySelector('.x').onclick=()=>el.remove();
+  el.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{el.remove();actions[b.dataset.k].run();});
+  box.appendChild(el); while(box.children.length>4)box.firstElementChild.remove();
+  const life=ms??(kind==='error'?0:kind==='warn'?12000:5000);
+  if(life)setTimeout(()=>el.remove(),life);
+  return el;
+}
+function toast(m,ms){return notify({kind:'ok',title:m,ms:typeof ms==='number'?ms:undefined});}
+function fail(m,title,actions){return notify({kind:'error',title:title||m,msg:title?m:'',actions});}
+function hint(m){return notify({kind:'info',title:m,ms:5000});}
+// A button that is working: disabled, with a spinner and what it's doing.
+function busy(b,label){if(!b)return()=>{};const html=b.innerHTML, dis=b.disabled;b.disabled=true;b.classList.add('busy');b.innerHTML=`<span class="spin" aria-hidden="true"></span>${esc(label)}`;
+  return()=>{b.classList.remove('busy');b.innerHTML=html;b.disabled=dis;};}
 function showLogin(){$('#app').classList.add('hidden');$('#login').classList.remove('hidden');$('#pw').focus();}
 $('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginErr').textContent='';
   try{await api('/api/login',{method:'POST',body:{password:$('#pw').value}});$('#pw').value='';await load(true);}catch(err){$('#loginErr').textContent=err.message;}};
@@ -511,13 +574,79 @@ function go(t){tab=t;$$('nav button').forEach(b=>b.setAttribute('aria-selected',
   if(t==='activity')loadMail(); if(t==='settings')fillSettings(); if(t==='campaigns')loadCampaigns(); if(t==='replies')loadReplies(); try{localStorage.setItem('ww-tab',t)}catch{} }
 document.addEventListener('click',e=>{const g=e.target.closest('[data-goto]');if(g)go(g.dataset.goto);});
 
+let lastFull=0;
 async function load(first){
-  try{S=await api('/api/state');}catch(e){if(e.message!=='Signed out')toast(e.message);return;}
+  lastFull=Date.now();
+  try{S=await api('/api/state');}catch(e){if(e.message!=='Signed out'&&!offline)fail(e.message,"Couldn't load the latest state");return;}
   $('#login').classList.add('hidden');$('#app').classList.remove('hidden');
   render();
   if(first){let t='overview';try{t=localStorage.getItem('ww-tab')||t}catch{};go(t);}
 }
-setInterval(()=>{if(!$('#app').classList.contains('hidden')&&!document.hidden)load(false)},20000);
+
+// ── What the mailer is doing right now ───────────────────────────────────────
+// follow: a cycle you started (Start or Run a cycle now). When it finishes, a message says what it did.
+let follow=null;
+const PHASE={connecting:'checking it can reach your mail servers',reading:'reading your inboxes, rescuing spam and marking mail important',replying:'sending the replies that are due',sending:'sending new warm-up emails',campaigns:'sending campaign emails'};
+const secsSince=iso=>{const n=Math.max(0,Math.round((Date.now()-new Date(iso))/1000));return n<60?n+'s':Math.floor(n/60)+'m '+(n%60)+'s';};
+const ago=iso=>{const n=Math.round((Date.now()-new Date(iso))/1000);return n<45?'just now':n<3600?Math.max(1,Math.round(n/60))+' min ago':n<86400?Math.round(n/3600)+' h ago':fmtTime(iso);};
+const until=iso=>{if(!iso)return 'not scheduled';const n=Math.round((new Date(iso)-Date.now())/1000);return n<=30?'any moment':n<3600?'in '+Math.round(n/60)+' min':'at '+fmtTime(iso);};
+const blockedNet=()=>(S?.network?.results||[]).filter(r=>!r.ok);
+function cycleLine(c){
+  const moved=c.sent+c.replies+c.campaign;
+  const d=[c.sent&&plural(c.sent,'email')+' sent',c.replies&&plural(c.replies,'reply','replies')+' sent',c.campaign&&plural(c.campaign,'campaign email')+' sent',c.checked&&plural(c.checked,'arrival')+' checked'].filter(Boolean);
+  return esc(d.length?d.join(', ')+'.':'nothing sent.')+(c.errors?` <span style="color:var(--bad-text)">${plural(c.errors,'error')}.</span>`:'')+(!moved&&c.note?' '+esc(c.note):'');
+}
+function renderStatus(){
+  const bar=$('#sbar'); if(!S){bar.innerHTML='';return;}
+  const s=S.settings, sc=S.scheduler, R=S.readiness||{}, c=sc.lastCycle;
+  let cls='', icon, html, acts='';
+  if(offline){cls='warn';icon='<span class="spin"></span>';html=`<b>Can't reach the mailer.</b> <span class="muted">If you just deployed, it's restarting. This page reconnects by itself.</span>`;}
+  else if(sc.running){cls='run';icon='<span class="spin"></span>';html=`<b>Working now:</b> ${PHASE[sc.phase]||'starting a cycle'}… <span class="muted">${sc.forced?'Started by hand ':'Started '}${secsSince(sc.runningSince)} ago</span>`;}
+  else if(s.paused){
+    cls=R.startBlock?'bad':'';icon=R.startBlock?'✗':'⏸';
+    html=R.startBlock?`<b>Paused, and it can't start yet.</b> ${esc(R.startBlock)}`:`<b>Paused.</b> Nothing is being sent. <span class="muted">Press Start warm-up when you're ready.</span>`;
+  }else if(R.startBlock||!R.readySenders){
+    cls='bad';icon='✗';html=`<b>Switched on, but nothing can be sent.</b> ${esc(R.startBlock||'No inbox can send yet. The list below says why for each one.')}`;
+  }else{
+    cls=c&&(c.errors||c.failed)?'warn':'good';icon=cls==='good'?'✓':'!';
+    html=`<b>${sc.inWindow?'On.':'On, outside sending hours.'}</b> ${c?`Last cycle ${ago(c.finishedAt)}: ${cycleLine(c)}`:'No cycle has finished since the mailer started.'} <span class="muted">Today ${R.newToday} of ${R.plannedToday} planned. Next cycle ${until(sc.nextTickAt)}.</span>`;
+  }
+  if(!offline&&blockedNet().length)acts+=`<button class="btn sm" data-g="netcheck">Re-check connection</button>`;
+  if(!offline&&!sc.running&&c&&c.errors)acts+=`<button class="btn sm" data-goto="activity">See errors</button>`;
+  const out=`<div><span class="si" aria-hidden="true">${icon}</span><span class="stx">${html}</span>${acts}</div>`;
+  bar.className='sbar '+cls;
+  if(bar._html!==out){bar._html=out;bar.innerHTML=out;}   // only when it changed, so its buttons stay clickable
+  document.title=(offline?'Offline · ':sc.running?'Working · ':cls==='bad'?'Needs you · ':'')+'PitchPersona Mailer';
+}
+// What a cycle you started did, as a message that says so.
+function announce(c){
+  const moved=c.sent+c.replies+c.campaign;
+  const d=[c.sent&&plural(c.sent,'warm-up email')+' sent',c.replies&&plural(c.replies,'reply','replies')+' sent',c.campaign&&plural(c.campaign,'campaign email')+' sent',c.checked&&plural(c.checked,'arrival')+' checked'].filter(Boolean);
+  const toActivity=[{label:'Open Activity',run:()=>go('activity')}];
+  if(c.failed)return fail(c.failed,'The cycle stopped with an error',toActivity);
+  if(c.errors){const e=c.errorSamples[0];return notify({kind:'error',title:`Cycle finished with ${plural(c.errors,'error')}`,msg:(d.length?d.join(', ')+'. ':'')+(e?`${e.inbox?e.inbox+': ':''}${e.message}`:''),actions:toActivity});}
+  if(moved)return notify({kind:'ok',title:'Cycle finished',msg:d.join(', ')+'.'});
+  return notify({kind:'warn',title:'Cycle finished. Nothing was sent',msg:[d.length?d.join(', ')+'.':'',c.note||''].filter(Boolean).join(' ')});
+}
+async function pollStatus(){
+  let st; try{st=await api('/api/status');}catch{return;}
+  const was=S.scheduler.running;
+  S.scheduler=st.scheduler; S.settings.paused=st.paused;
+  const c=st.scheduler.lastCycle;
+  if(follow&&!st.scheduler.running&&c&&c.startedAt!==follow.prev){follow=null;announce(c);}
+  if(follow&&Date.now()>follow.until)follow=null;
+  if(was&&!st.scheduler.running)await load(false); else if(!was&&st.scheduler.running)render(); else renderStatus();
+}
+// One clock: the status bar's timers every second, quick checks while a cycle runs, a full refresh every 20 seconds.
+let polling=false;
+setInterval(()=>{
+  if(!S||$('#app').classList.contains('hidden')||document.hidden)return;
+  const now=Date.now();
+  if(offline){if(now-lastFull>5000)load(false);renderStatus();return;}
+  if(!polling&&now-(pollStatus.at||0)>=(S.scheduler.running||follow?2000:4000)){pollStatus.at=now;polling=true;pollStatus().finally(()=>polling=false);}
+  if(now-lastFull>20000)load(false);
+  renderStatus();
+},1000);
 
 const fmtTime=iso=>iso?new Date(iso).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'never';
 const shortDay=d=>new Date(d+'T12:00:00Z').toLocaleDateString([], {month:'short',day:'numeric',timeZone:'UTC'});
@@ -527,15 +656,16 @@ function render(){
   const pill=$('#statusPill');
   const R=S.readiness||{};
   // The pill only says "Running" when something can actually be sent.
-  if(s.paused){pill.className='pill warn';pill.textContent='Paused';}
+  if(sc.running){pill.className='pill info';pill.textContent='Working';}
+  else if(s.paused){pill.className='pill warn';pill.textContent='Paused';}
   else if(R.startBlock){pill.className='pill bad';pill.textContent='On, but no inboxes to use';}
   else if(!R.readySenders){pill.className='pill warn';pill.textContent='On, but no inbox can send yet';}
   else if(!sc.inWindow){pill.className='pill info';pill.textContent='Running, outside working hours';}
   else{pill.className='pill good';pill.textContent='Running';}
   $('#toggleBtn').textContent=s.paused?'Start warm-up':'Pause all';
   $('#toggleBtn').className='btn big '+(s.paused?'primary':'');
-  $('#runBtn').disabled=s.paused||!!R.startBlock;
-  $('#runBtn').title=s.paused?'Press Start warm-up first':R.startBlock||'Runs one cycle now, outside working hours too. Every limit still applies.';
+  $('#runBtn').disabled=s.paused||!!R.startBlock||sc.running;
+  $('#runBtn').title=s.paused?'Press Start warm-up first':R.startBlock||(sc.running?'A cycle is running now. The bar below shows its progress.':'Runs one cycle now, outside working hours too. Every limit still applies.');
 
   // Safety banners
   const probs=[], senders=S.inboxes.filter(i=>i.role==='sender');
@@ -547,15 +677,20 @@ function render(){
   S.domains.filter(d=>!d.ok&&!d.error).forEach(d=>probs.push(['bad',`${esc(d.domain)} is missing ${['spf','dkim','dmarc'].filter(k=>!d[k]).map(k=>k.toUpperCase()).join(', ')}. ${s.requireDns?'Sending from it is blocked.':' <b>The DNS gate is off in Settings, so it can still send, and its mail will likely land in spam.</b>'}`]));
   S.inboxes.filter(i=>i.paused&&i.pause_reason).forEach(i=>probs.push(['bad',`${esc(i.email)} paused itself: ${esc(i.pause_reason)}`]));
   S.inboxes.filter(i=>!i.hasPassword).forEach(i=>probs.push(['warn',`${esc(i.email)} has no app password saved.`]));
-  S.inboxes.filter(i=>i.hasPassword&&i.login==='failed'&&!i.paused).forEach(i=>probs.push(['bad',`${esc(i.email)} failed its last login test. Check the app password and that IMAP is on, then press Test login again.`]));
+  const net=netProblem(); if(net)probs.unshift(['bad',net]);
+  S.inboxes.filter(i=>i.hasPassword&&i.login==='failed'&&!i.paused).forEach(i=>{const f=loginFailures(i).filter(x=>!(net&&/_blocked$/.test(x.code)));
+    if(!f.length&&net)return;
+    probs.push(['bad',`<b>${esc(i.email)}</b> can't sign in. ${f.length?f.map(x=>`${esc(x.label)} failed: ${esc(x.why)} <b>Fix:</b> ${linkify(x.fix)}`).join(' '):'Press Test login to see why.'}
+      <div class="row"><button class="btn sm" data-g="test" data-id="${i.id}">Test login</button><button class="btn sm" data-g="edit" data-id="${i.id}">Edit inbox</button></div>`]);});
   S.domains.filter(d=>d.signing&&!['pass','signed'].includes(d.signing.result)).forEach(d=>probs.push(['warn',`Mail from ${esc(d.domain)} isn't signed with your DKIM key yet (${esc(d.signing.result==='unaligned'?"Google's default key was used":'dkim='+d.signing.result)}). In Google Admin open Apps, Google Workspace, Gmail, Authenticate email, pick ${esc(d.domain)} and click Start authentication.`]));
   if(!s.aiKeySet&&s.aiEnabled) probs.push(['warn','No OpenRouter key saved, so emails use the built-in templates. Add a key in Settings.']);
   if(!s.requireDns) probs.push(['bad','The DNS safety gate is turned off in Settings.']);
   const lh=linkHost();
   if(S.campaigns?.count&&lh&&!onSendingDomain(lh)) probs.push(['warn',`Links in campaign emails would point at <b>${esc(lh)}</b>, which isn't one of your sending domains. Before a campaign sends, set an address on a sending domain under Settings, Cold email safety.`]);
   const lvl=probs.some(p=>p[0]==='bad')?'bad':probs.length?'warn':'good';
-  $('#banners').innerHTML=probs.length?`<div class="banner ${lvl}"><b>${probs.length} thing${probs.length>1?'s':''} to check</b><ul>${probs.map(p=>`<li>${p[1]}</li>`).join('')}</ul></div>`
+  $('#banners').innerHTML=probs.length?`<div class="banner ${lvl}"><b>${probs.length} thing${probs.length>1?'s':''} to fix</b><ul>${probs.map(p=>`<li>${p[1]}</li>`).join('')}</ul></div>`
     :`<div class="banner good"><b>All safety checks pass.</b> <span class="muted small">Last cycle ${fmtTime(sc.lastTickAt)} · next ${fmtTime(sc.nextTickAt)}</span></div>`;
+  renderStatus();
 
   // Tiles
   const t=S.totals, plc=t.placement7d;
@@ -591,6 +726,61 @@ function render(){
   f.innerHTML='<option value="">All inboxes</option>'+S.inboxes.map(i=>`<option ${i.email===cur?'selected':''}>${esc(i.email)}</option>`).join('');
 }
 
+// Login results in words: what failed, why, and what to do.
+// When sending and reading failed for the same reason, that's said once.
+function loginFailures(i){const d=i.loginDetail||{};
+  const f=[['Sending',d.smtp],['Reading',d.imap]].filter(([,x])=>x&&!x.ok).map(([label,x])=>({label,...x}));
+  return f.length===2&&f[0].code===f[1].code&&f[0].fix===f[1].fix?[{...f[0],label:'Sending and reading'}]:f;}
+// One banner item when this server can't reach a mail server at all, instead of one per inbox.
+function netProblem(){
+  const cut=blockedNet(); if(!cut.length)return null;
+  const smtp=cut.filter(r=>r.kind==='smtp'), rail=S.network.onRailway&&smtp.length;
+  const where=cut.map(r=>`${esc(r.host)} on port ${r.port}`).join(' and ');
+  const pwOk=S.inboxes.some(i=>i.loginDetail?.imap?.ok);
+  return `<b>${rail?'Railway is blocking outgoing email.':"This server can't connect to your mail server."}</b> The mailer can't open a connection to ${where}${rail?", because Railway's Free, Trial and Hobby plans block every email-sending (SMTP) connection":''}. ${smtp.length?'No inbox can send until it connects.':'Reading mail waits until it connects.'}
+    <div class="small" style="margin-top:4px"><b>Fix:</b> ${rail?'In Railway, upgrade this workspace to the Pro plan, then redeploy the mailer (Railway only opens the email ports on a new deploy). The mailer checks the connection when it starts and tests the logins again by itself.':'Check the host and port under Edit, Server settings, or allow outgoing connections on that port. Then press Re-check connection.'}${pwOk?' Reading mail already works, so the app passwords are right.':''}</div>
+    <div class="row"><button class="btn sm primary" data-g="netcheck">Re-check connection</button></div>`;
+}
+function loginBlock(i){
+  const line=(ic,cls,txt)=>`<div class="lres"><div class="ln"><span class="${cls}">${ic}</span><span>${txt}</span></div></div>`;
+  if(testing.has(i.id))return `<div class="lres"><div class="ln"><span class="spin" style="color:var(--accent-text)"></span><span>Testing sending and reading. This can take up to a minute.</span></div></div>`;
+  if(!i.hasPassword)return line('✗','no','No app password saved. Press <b>Edit</b> and paste it.');
+  if(i.login==null)return line('○','muted','<span class="muted">Not tested yet. Press <b>Test login</b>.</span>');
+  const d=i.loginDetail||{};
+  if(i.login==='failed'&&!d.smtp&&!d.imap)return line('✗','no',`Failed ${fmtTime(i.loginAt)}. Press <b>Test login</b> again to see why.`);
+  const row=(label,x)=>!x?'':x.ok?`<div class="ln"><span class="ok">✓</span><span>${label} works</span></div>`
+    :`<div class="ln"><span class="no">✗</span><span><b>${label} failed.</b> ${esc(x.why)}</span><div class="fixbox"><b>Fix:</b> ${linkify(x.fix)}<details><summary>What the server said</summary><code>${esc(x.raw)}</code></details></div></div>`;
+  const same=d.smtp&&d.imap&&!d.smtp.ok&&!d.imap.ok&&d.smtp.code===d.imap.code&&d.smtp.fix===d.imap.fix;
+  return `<div class="lres">${same?row('Sending and reading',d.smtp):row('Sending (SMTP)',d.smtp)+row('Reading (IMAP)',d.imap)}<div class="muted small">Tested ${fmtTime(i.loginAt)}</div></div>`;
+}
+const testing=new Set();
+// Tests one inbox's login, shows progress on its card, and says how it went.
+async function testLogin(id,{quiet=false}={}){
+  const i=S.inboxes.find(x=>x.id==id); if(!i)return null;
+  testing.add(i.id); renderInboxCards();
+  let r=null;
+  try{r=await api(`/api/inboxes/${i.id}/test`,{method:'POST'});
+    if(!quiet){
+      if(r.ok)toast(`${i.email}: sending and reading both work`);
+      else{const f=[['Sending',r.detail?.smtp],['Reading',r.detail?.imap]].filter(([,x])=>x&&!x.ok);
+        fail(f.map(([k,x])=>`${k}: ${x.why}`).join(' '),`${i.email} can't sign in`,[{label:'See the fix',run:()=>showCard(i.id)}]);}
+    }
+  }catch(e){if(!quiet)fail(e.message,`Couldn't test ${i.email}`);r={ok:false,error:e.message};}
+  testing.delete(i.id); await load(false);
+  return r;
+}
+async function testMany(ids,b){
+  const restore=b?busy(b,'Testing…'):()=>{}, bad=[];
+  for(const [k,id] of ids.entries()){if(b)b.lastChild.textContent=`Testing ${k+1} of ${ids.length}…`;
+    const i=S.inboxes.find(x=>x.id==id), r=await testLogin(id,{quiet:true}); if(!r?.ok)bad.push({email:i?.email,r});}
+  restore();
+  if(!ids.length)return;
+  if(!bad.length)return toast(`All ${plural(ids.length,'login')} work`);
+  const first=bad[0], why=first.r.error||[first.r.detail?.smtp,first.r.detail?.imap].find(x=>x&&!x.ok)?.why||'';
+  fail(`${first.email}: ${why}${bad.length>1?` The Inboxes tab shows the fix for each one.`:''}`,`${bad.length} of ${plural(ids.length,'login')} failed`,[{label:'Open Inboxes',run:()=>go('inboxes')}]);
+}
+function showCard(id){go('inboxes');setTimeout(()=>document.querySelector(`[data-card="${id}"]`)?.scrollIntoView({block:'center',behavior:'smooth'}),50);}
+
 function statusPill(i){
   const map={active:['good','Warming up'],slowed:['warn','Slowed down'],seed:['info','Seed'],blocked:[i.paused?'warn':'bad',i.paused?'Paused':'Blocked']};
   // While the whole mailer is paused nothing warms up, so a healthy inbox only says it's ready.
@@ -602,15 +792,15 @@ function renderInboxCards(){
   const box=$('#inboxCards');
   if(!S.inboxes.length){box.innerHTML=`<div class="card" style="grid-column:1/-1"><h2>Add your first inboxes</h2>${HOW_PASSWORDS}
     <div class="row" style="margin-top:12px"><button class="btn primary" data-g="bulk">Add several at once</button><button class="btn" data-g="add">Add one inbox</button></div></div>`;return;}
-  box.innerHTML=S.inboxes.map(i=>`<div class="card ibox" style="margin:0">
+  box.innerHTML=S.inboxes.map(i=>`<div class="card ibox" style="margin:0" data-card="${i.id}">
     <div class="row spread"><div><h3>${esc(i.email)}</h3><div class="muted small">${esc(i.name)} · ${i.role==='seed'?'Seed':'Sender'} · ${esc(i.provider)}</div></div>${statusPill(i)}</div>
-    ${i.blocked?`<div class="small" style="color:${i.paused?'var(--warn-text)':'var(--bad-text)'}">${esc(i.blocked)}</div>`:''}
+    ${i.blocked&&!/^Its last login test failed/.test(i.blocked)?`<div class="small" style="color:${i.paused?'var(--warn-text)':'var(--bad-text)'}">${esc(i.blocked)}</div>`:''}
+    ${loginBlock(i)}
     ${i.role==='sender'?`<div class="chart" data-ramp="${i.id}"></div><div class="legend" style="margin:0"><span><i style="background:var(--s1)"></i>Sent</span><span><i style="background:var(--ref);height:2px"></i>Planned</span></div>`:''}
-    <dl class="kv"><dt>Warm-up day</dt><dd>${i.role==='seed'?'–':i.day||'starts '+shortDay(i.start_date)}</dd><dt>Sent 7d</dt><dd>${i.sent7d}</dd><dt>Received 7d</dt><dd>${i.received7d}</dd><dt>Errors 7d</dt><dd>${i.errors7d}</dd><dt>Password</dt><dd>${i.hasPassword?'Saved (encrypted)':'<span style="color:var(--bad-text)">Missing</span>'}</dd>
-      <dt>Login</dt><dd>${i.login==='ok'?`<span style="color:var(--good-text)">✓ Works</span> <span class="muted">tested ${fmtTime(i.loginAt)}</span>`:i.login==='failed'?`<span style="color:var(--bad-text)">✗ Failed ${fmtTime(i.loginAt)}</span>`:'<span class="muted">Not tested yet. Press Test login.</span>'}</dd></dl>
+    <dl class="kv"><dt>Warm-up day</dt><dd>${i.role==='seed'?'–':i.day||'starts '+shortDay(i.start_date)}</dd><dt>Sent 7d</dt><dd>${i.sent7d}</dd><dt>Received 7d</dt><dd>${i.received7d}</dd><dt>Errors 7d</dt><dd>${i.errors7d}</dd><dt>Password</dt><dd>${i.hasPassword?'Saved (encrypted)':'<span style="color:var(--bad-text)">Missing</span>'}</dd></dl>
     <div class="acts">
       <button class="btn sm" data-act="pause" data-id="${i.id}">${i.paused?'Resume':'Pause'}</button>
-      <button class="btn sm" data-act="test" data-id="${i.id}">Test login</button>
+      <button class="btn sm" data-act="test" data-id="${i.id}" ${testing.has(i.id)?'disabled':''}>${testing.has(i.id)?'<span class="spin"></span> Testing…':'Test login'}</button>
       ${i.role==='sender'?`<button class="btn sm" data-act="send" data-id="${i.id}">Send one now</button>`:''}
       <button class="btn sm" data-act="edit" data-id="${i.id}">Edit</button>
       <button class="btn sm danger" data-act="del" data-id="${i.id}">Remove</button><button type="button" class="qh" data-help="inboxActions" aria-label="What do these buttons do?" aria-expanded="false">?</button>
@@ -620,16 +810,17 @@ function renderInboxCards(){
 
 $('#inboxCards').addEventListener('click',async e=>{
   const b=e.target.closest('[data-act]'); if(!b)return;
-  const i=S.inboxes.find(x=>x.id==b.dataset.id); b.disabled=true;
+  const i=S.inboxes.find(x=>x.id==b.dataset.id), act=b.dataset.act;
+  if(act==='edit')return openInbox(i);
+  if(act==='test')return testLogin(i.id);
+  if(act==='del'&&!confirm(`Remove ${i.email}? Its history stays in the stats. Leads it was emailing wait in review, so you can check this mailbox for replies first.`))return;
+  const done=busy(b,{pause:i.paused?'Resuming…':'Pausing…',send:'Writing and sending…',del:'Removing…'}[act]||'Working…');
   try{
-    if(b.dataset.act==='pause'){await api('/api/inboxes/'+i.id,{method:'PUT',body:{paused:!i.paused}});toast(i.paused?'Inbox resumed':'Inbox paused');}
-    if(b.dataset.act==='test'){b.textContent='Testing...';const r=await api(`/api/inboxes/${i.id}/test`,{method:'POST'});
-      alert(`${i.email}\n\nSending (SMTP): ${r.smtp==='ok'?'OK':'FAILED: '+r.smtp}\nReading (IMAP): ${r.imap==='ok'?'OK':'FAILED: '+r.imap}`);}
-    if(b.dataset.act==='send'){b.textContent='Sending...';const r=await api(`/api/inboxes/${i.id}/send-test`,{method:'POST'});toast(`Sent to ${r.to}: "${r.subject}" (${r.by==='ai'?'AI':'template'})`);}
-    if(b.dataset.act==='edit'){openInbox(i);}
-    if(b.dataset.act==='del'){if(confirm(`Remove ${i.email}? Its history stays in the stats. Leads it was emailing wait in review, so you can check this mailbox for replies first.`)){await api('/api/inboxes/'+i.id,{method:'DELETE'});toast('Inbox removed');}}
-  }catch(err){toast(err.message);}
-  await load(false);
+    if(act==='pause'){await api('/api/inboxes/'+i.id,{method:'PUT',body:{paused:!i.paused}});toast(i.paused?`${i.email} resumed`:`${i.email} paused. It still reads its mail.`);}
+    if(act==='send'){const r=await api(`/api/inboxes/${i.id}/send-test`,{method:'POST'});notify({kind:'ok',title:`Sent from ${i.email} to ${r.to}`,msg:`"${r.subject}", written by ${r.by==='ai'?'the AI':'a template'}. Activity shows where it lands after the next cycle.`});}
+    if(act==='del'){await api('/api/inboxes/'+i.id,{method:'DELETE'});toast(`${i.email} removed`);}
+  }catch(err){fail(err.message,{pause:"Couldn't change this inbox",send:`Couldn't send from ${i.email}`,del:`Couldn't remove ${i.email}`}[act]);}
+  done(); await load(false);
 });
 
 // Inbox dialog
@@ -650,9 +841,13 @@ form.provider.onchange=()=>{const p=S.providers[form.provider.value];for(const k
 form.onsubmit=async e=>{
   if(e.submitter?.value!=='save')return; e.preventDefault();
   const body=Object.fromEntries(new FormData(form)); if(!body.password)delete body.password; body.cap=body.cap===''?null:Number(body.cap);
-  try{ if(editing) await api('/api/inboxes/'+editing.id,{method:'PUT',body}); else await api('/api/inboxes',{method:'POST',body});
-    dlg.close(); toast(editing?'Inbox saved':'Inbox added. Press "Test login" to check it.'); await load(false);
-  }catch(err){$('#inboxErr').textContent=err.message;}
+  const done=busy(e.submitter,'Saving…');
+  try{ const r=editing? await api('/api/inboxes/'+editing.id,{method:'PUT',body}) : await api('/api/inboxes',{method:'POST',body});
+    dlg.close(); done(); await load(false);
+    // A new password gets tested straight away, so you know now rather than at the first send.
+    if(body.password){toast(`${body.email||editing.email} saved. Testing its login now…`);testLogin(r.id);}
+    else toast(editing?'Inbox saved':'Inbox added. Save its app password, then it tests the login.');
+  }catch(err){done();$('#inboxErr').textContent=err.message;}
 };
 
 // Bulk add
@@ -661,25 +856,42 @@ $('#bulkBtn').onclick=()=>{$('#bulkForm').reset();$('#bulkForm').start_date.valu
 $('#bulkCancel').onclick=()=>bulk.close();
 $('#bulkForm').onsubmit=async e=>{
   if(e.submitter?.value!=='save')return; e.preventDefault();
+  const done=busy(e.submitter,'Adding…');
   try{const r=await api('/api/inboxes/bulk',{method:'POST',body:Object.fromEntries(new FormData(e.target))});
     $('#bulkOut').innerHTML=r.results.map(x=>`<div style="color:${x.ok?'var(--good-text)':'var(--bad-text)'}">${x.ok?'✓ Added':'✗ '+esc(x.error)}: ${esc(x.email)}</div>`).join('')||'Nothing to add.';
-    if(r.results.every(x=>x.ok))e.target.lines.value=''; await load(false);
-  }catch(err){$('#bulkOut').textContent=err.message;}
+    if(r.results.every(x=>x.ok))e.target.lines.value=''; done(); await load(false);
+    const added=r.results.filter(x=>x.ok).map(x=>S.inboxes.find(i=>i.email===String(x.email).toLowerCase())).filter(i=>i&&i.hasPassword);
+    if(added.length){if(r.results.every(x=>x.ok))bulk.close();toast(`${plural(added.length,'inbox','inboxes')} added. Testing each login now…`);go('inboxes');testMany(added.map(i=>i.id));}
+  }catch(err){done();$('#bulkOut').textContent=err.message;}
 };
 
 // Header actions
 $('#toggleBtn').onclick=async()=>{
-  const starting=S.settings.paused, R=S.readiness||{};
-  if(starting&&R.startBlock){toast(R.startBlock,8000);go('inboxes');return;}
-  if(starting&&!R.readySenders){if(!confirm('No inbox can send yet. The Overview lists why (DNS, missing password or paused). Switch on anyway? Sending starts by itself once an inbox is ready.'))return;}
-  else if(starting&&S.domains.some(d=>!d.ok)&&!confirm('Some domains fail the DNS check, so their inboxes stay blocked. Start the others?'))return;
+  const b=$('#toggleBtn'), starting=S.settings.paused, R=S.readiness||{};
+  if(starting&&!R.startBlock&&!R.readySenders){if(!confirm('No inbox can send yet. The Overview lists why (DNS, missing password or paused). Switch on anyway? Sending starts by itself once an inbox is ready.'))return;}
+  else if(starting&&!R.startBlock&&S.domains.some(d=>!d.ok)&&!confirm('Some domains fail the DNS check, so their inboxes stay blocked. Start the others?'))return;
+  const done=busy(b,starting?'Checking…':'Pausing…'), prev=S.scheduler.lastCycle?.startedAt||null;
   try{await api('/api/pause',{method:'POST',body:{paused:!starting}});
-    toast(!starting?'Everything paused':R.readySenders?`Warm-up started with ${R.readySenders} sending inbox${R.readySenders>1?'es':''}`:'Switched on. Nothing sends until an inbox is ready.');}
-  catch(e){toast(e.message,8000);if(/inbox/i.test(e.message))go('inboxes');}
-  load(false);
+    if(starting){follow={prev,until:Date.now()+600000};
+      notify({kind:'ok',title:'Warm-up is on',msg:R.readySenders?'The first cycle is running now. The bar at the top shows each step, and a message here says what it did.':'Nothing sends until an inbox is ready. The list on Overview says what each one needs.'});}
+    else notify({kind:'ok',title:'Everything is paused',msg:S.scheduler.running?'The cycle in progress stops before its next email. Nothing more will be sent.':'Nothing more will be sent until you press Start warm-up.'});
+  }catch(e){fail(e.message,starting?"Warm-up didn't start":"Couldn't pause",e.body?.code==='not_ready'?[{label:'Open Overview',run:()=>go('overview')}]:[]);}
+  done(); await load(false);
 };
-$('#runBtn').onclick=async()=>{try{await api('/api/run-now',{method:'POST'});toast(S.readiness?.readySenders?'Cycle started. Check Activity in a minute.':'Cycle started, but no inbox can send yet, so it will only check mailboxes.');setTimeout(()=>load(false),8000);}catch(e){toast(e.message,8000);}};
-$('#dnsBtn').onclick=async e=>{e.target.disabled=true;e.target.textContent='Checking...';try{await api('/api/dns-check',{method:'POST'});await load(false);toast('DNS re-checked');}catch(err){toast(err.message);}e.target.disabled=false;e.target.textContent='Re-check DNS';};
+$('#runBtn').onclick=async()=>{
+  const b=$('#runBtn'), done=busy(b,'Starting…'), prev=S.scheduler.lastCycle?.startedAt||null;
+  try{await api('/api/run-now',{method:'POST'});
+    follow={prev,until:Date.now()+600000};
+    Object.assign(S.scheduler,{running:true,phase:'connecting',runningSince:new Date().toISOString(),forced:true});
+    notify({kind:'info',title:'Cycle started',msg:S.readiness?.readySenders?'The bar at the top shows each step. A message here says what it did when it finishes.':'No inbox can send yet, so it only reads the inboxes. A message here says what it did.',ms:6000});}
+  catch(e){if(e.body?.running){follow={prev,until:Date.now()+600000};hint('A cycle is already running. A message here says what it did when it finishes.');}else fail(e.message,"The cycle didn't start");}
+  done(); render();
+};
+$('#dnsBtn').onclick=async e=>{const b=e.currentTarget, done=busy(b,'Checking DNS…');
+  try{const r=await api('/api/dns-check',{method:'POST'});const bad=r.filter(d=>!d.ok);
+    bad.length?notify({kind:'warn',title:`${plural(bad.length,'domain')} not ready yet`,msg:bad.map(d=>d.error||`${d.domain} is missing ${['spf','dkim','dmarc'].filter(k=>!d[k]).map(k=>k.toUpperCase()).join(', ')}`).join(' ')}):toast(r.length?`DNS checked: ${plural(r.length,'domain')} ready to send`:'Add a sending inbox first');}
+  catch(err){fail(err.message,"Couldn't check DNS");}
+  done(); await load(false);};
 $('#clearErrBtn').onclick=async()=>{await api('/api/errors/clear',{method:'POST'});load(false);};
 
 // ── Setup guide: every step ticks itself off from live state ──────────────────
@@ -703,7 +915,7 @@ function guideSteps(){
   const doms=S.domains,pw=ins.filter(i=>i.hasPassword),okLogin=ins.filter(i=>i.login==='ok'),badLogin=ins.filter(i=>i.login==='failed'),untested=pw.filter(i=>i.login!=='ok');
   const N=s.coldMinWarmDays,bestDay=Math.max(0,...snd.map(i=>i.day||0)),coldReady=snd.filter(i=>i.coldOk).length;
   const signed=d=>!!d.signing&&['pass','signed'].includes(d.signing.result), unsigned=doms.filter(d=>d.signing&&!signed(d));
-  const blockedNow=s.paused||!!R.startBlock;
+  const blockedNow=s.paused||!!R.startBlock, net=netProblem();
   return [
     {id:'volume',title:'Keep your data safe',done:!!S.storage.persistent,prob:!S.storage.persistent,
       status:S.storage.persistent?'Inboxes and history are saved on a volume':'Not saved yet. A redeploy erases inboxes and passwords',
@@ -713,13 +925,14 @@ function guideSteps(){
       body:`<p style="margin:0">Warm-up sends emails between your own inboxes, so it needs at least two. Add every inbox you want to warm up as a <b>Sender</b>, and keep your main domain's inboxes out.</p>
         <p class="note">Seeds are optional: personal Gmail or Outlook inboxes at other providers. They only receive and reply, which shows how outside providers treat your mail.</p>
         <div class="acts"><button class="btn primary sm" data-g="bulk">Add several at once</button><button class="btn sm" data-g="add">Add one inbox</button></div>`},
-    {id:'login',title:'Create app passwords and test each login',done:ins.length>=2&&okLogin.length===ins.length,prob:badLogin.length>0,
-      status:!ins.length?'Add inboxes first':`${okLogin.length} of ${ins.length} logins work`+(badLogin.length?`, ${badLogin.length} failed`:'')+(ins.length>pw.length?`, ${ins.length-pw.length} without a password`:''),
+    {id:'login',title:'Create app passwords and test each login',done:ins.length>=2&&okLogin.length===ins.length,prob:badLogin.length>0||!!net,
+      status:!ins.length?'Add inboxes first':`${okLogin.length} of ${ins.length} logins work`+(badLogin.length?`, ${badLogin.length} failed`:'')+(ins.length>pw.length?`, ${ins.length-pw.length} without a password`:'')+(net&&S.network.onRailway&&blockedNet().some(r=>r.kind==='smtp')?'. Railway is blocking outgoing email':net?". This server can't reach the mail server":''),
       body:`<ol><li>In ${ext('https://admin.google.com','Google Admin')}, allow 2-Step Verification (Security, Authentication, 2-step verification) and turn on IMAP (Apps, Google Workspace, Gmail, End User Access, POP and IMAP access).</li>
         <li>Sign in as each inbox, turn on ${ext('https://myaccount.google.com/signinoptions/twosv','2-Step Verification')}, then create an ${ext('https://myaccount.google.com/apppasswords','app password')} named Mailer and copy the 16 letters.</li>
         <li>Paste it into the inbox here (Inboxes, Edit, App password).</li>
         <li>Press <b>Test login</b>. It checks both sending (SMTP) and reading (IMAP).</li></ol>
-        ${badLogin.length?`<p class="prob">Failed: ${badLogin.map(i=>esc(i.email)).join(', ')}. Usually the app password was mistyped, or IMAP is off in Google Admin.</p>`:''}
+        ${net?`<div class="issue">${net}</div>`:''}
+        ${badLogin.map(i=>{const f=loginFailures(i).filter(x=>!(net&&/_blocked$/.test(x.code)));return f.length||!net?`<div class="issue"><b>${esc(i.email)}</b>: ${f.length?f.map(x=>`${esc(x.label)} failed. ${esc(x.why)} <b>Fix:</b> ${linkify(x.fix)}`).join(' '):'failed. Press Test login again to see why.'}</div>`:'';}).join('')}
         ${ins.length>pw.length?`<p class="prob">No app password yet: ${ins.filter(i=>!i.hasPassword).map(i=>esc(i.email)).join(', ')}.</p>`:''}
         <div class="acts">${untested.length?`<button class="btn primary sm" data-g="testall">Test ${untested.length===1?'1 login':`${untested.length} logins`}</button>`:''}<button class="btn sm" data-goto="inboxes">Open Inboxes</button></div>`},
     {id:'dns',title:'Publish SPF, DKIM and DMARC',done:doms.length>0&&doms.every(d=>d.ok),prob:doms.some(d=>!d.ok),
@@ -806,24 +1019,28 @@ document.addEventListener('click',async e=>{
   if(act==='start')return $('#toggleBtn').click();
   if(act==='run')return $('#runBtn').click();
   if(act==='dkimyes'||act==='dkimno'){g.disabled=true;
-    try{await api('/api/settings',{method:'PUT',body:{dkimConfirmed:act==='dkimyes'}});toast(act==='dkimyes'?'Marked done. It confirms itself once signed warm-up mail arrives.':'Unmarked.');}catch(err){toast(err.message);}
+    try{await api('/api/settings',{method:'PUT',body:{dkimConfirmed:act==='dkimyes'}});toast(act==='dkimyes'?'Marked done. It confirms itself once signed warm-up mail arrives.':'Unmarked.');}catch(err){fail(err.message);}
     return load(false);}
-  if(act==='testall'){
-    const list=S.inboxes.filter(i=>i.hasPassword&&i.login!=='ok'), bad=[]; g.disabled=true;
-    for(const [k,i] of list.entries()){g.textContent=`Testing ${k+1} of ${list.length}...`;
-      try{const r=await api(`/api/inboxes/${i.id}/test`,{method:'POST'});if(r.smtp!=='ok'||r.imap!=='ok')bad.push(i.email);}catch(err){bad.push(i.email);}}
-    toast(bad.length?`${bad.length} of ${list.length} failed: ${bad.join(', ')}. The step lists what to check.`:`All ${list.length} logins work.`,bad.length?10000:4000);
-    return load(false);}
+  if(act==='testall')return testMany(S.inboxes.filter(i=>i.hasPassword&&i.login!=='ok').map(i=>i.id),g);
+  if(act==='test')return testLogin(g.dataset.id);
+  if(act==='edit'){const i=S.inboxes.find(x=>x.id==g.dataset.id);return i&&openInbox(i);}
+  if(act==='netcheck'){const done=busy(g,'Checking…');
+    try{const r=await api('/api/net-check',{method:'POST'}), bad=r.results.filter(x=>!x.ok);
+      if(bad.length)fail(`${bad.map(x=>`${x.host} on port ${x.port} (${x.error})`).join(', ')}. ${S.network.onRailway&&bad.some(x=>x.kind==='smtp')?'Railway still blocks outgoing email. It allows it only on the Pro plan, and only after a redeploy once you upgrade.':'The connection is still blocked.'}`,"Still can't connect");
+      else toast(r.results.length?'Every mail server connects':'Nothing to check yet. Add an inbox first.');}
+    catch(err){fail(err.message,"Couldn't check the connection");}
+    done(); return load(false);}
 });
 
 // ── Help where it's needed: each "?" opens a short explanation next to the control ──
 const HELP={
-  status:{t:'Status and the top buttons',b:()=>`<ul><li><b>Paused</b>: nothing is sent.</li><li><b>Running</b>: sending inside working hours (${S.settings.startHour}:00 to ${S.settings.endHour}:00).</li><li><b>On, but no inbox can send yet</b>: switched on, but every inbox is blocked. The banner says why.</li></ul>
+  status:{t:'Status and the top buttons',b:()=>`<ul><li><b>Paused</b>: nothing is sent.</li><li><b>Running</b>: sending inside working hours (${S.settings.startHour}:00 to ${S.settings.endHour}:00).</li><li><b>Working</b>: a cycle is running right now.</li><li><b>On, but no inbox can send yet</b>: switched on, but every inbox is blocked. The banner says why.</li></ul>
+    <p>The bar under the tabs always says what the mailer is doing: the step a running cycle is on, what the last cycle sent and why it sent nothing, and when the next one runs.</p>
     <p><b>Start warm-up</b> switches the mailer on, or says what's missing. <b>Pause all</b> stops everything, campaigns included.</p><p><b>Run a cycle now</b> does one round straight away, even outside working hours. Limits still apply.</p>`},
   placement:{t:'Inbox placement',b:()=>`<p>The share of warm-up emails that landed in the inbox rather than spam, as seen by the inbox that received them.</p><ul><li>90% or more is healthy.</li><li>Below ${S.settings.slowdownBelow}%, that inbox sends half as much.</li><li>Below ${S.settings.autoPauseBelow}%, it pauses itself.</li></ul>`},
   dns:{t:'Domain authentication',b:`<p>SPF, DKIM and DMARC prove your mail really comes from your domain. Without all three, Gmail and Outlook send it to spam, so sending is blocked until they're found.</p><p>A passing result is kept for 6 hours. A failing domain is checked again every 15 minutes, or press <b>Re-check DNS</b> after changing a record.</p><p>DKIM also needs <b>Start authentication</b> clicked in Google Admin.</p>`},
   roles:{t:'Senders and seeds',b:`<p><b>Sender</b>: an inbox on your sending domains. It warms up on the ramp and can later send campaigns.</p><p><b>Seed</b>: an inbox at another provider, like a personal Gmail or Outlook. It only receives and replies, which shows how outside providers treat your mail.</p><p><b>Add several</b> takes one line per inbox: <code>email, app password, name</code>.</p>`},
-  inboxActions:{t:'Inbox buttons',b:`<ul><li><b>Pause / Resume</b>: stops sending from this inbox only. It still reads mail, so replies are caught.</li><li><b>Test login</b>: signs in to send and to read, without sending anything.</li><li><b>Send one now</b>: sends one real warm-up email to another of your inboxes. It counts toward today's limit.</li><li><b>Edit</b>: change the name, app password, daily cap or day 1.</li><li><b>Remove</b>: deletes the inbox. History stays, and leads it was emailing wait in Review.</li></ul>`},
+  inboxActions:{t:'Inbox buttons',b:`<ul><li><b>Pause / Resume</b>: stops sending from this inbox only. It still reads mail, so replies are caught.</li><li><b>Test login</b>: signs in to send and to read, without sending anything. A failure shows the reason and the fix on the card.</li><li><b>Send one now</b>: sends one real warm-up email to another of your inboxes. It counts toward today's limit.</li><li><b>Edit</b>: change the name, app password, daily cap or day 1.</li><li><b>Remove</b>: deletes the inbox. History stays, and leads it was emailing wait in Review.</li></ul>`},
   campaigns:{t:'How campaigns work',b:()=>`<ol><li><b>New campaign</b>, then add leads.</li><li>Check the sequence and preview it.</li><li>Pick inboxes and hours.</li><li><b>Send a test</b>, then <b>Start sending</b>.</li></ol><p>An inbox sends campaigns only after ${S.settings.coldMinWarmDays} warm-up days with ${S.settings.coldMinPlacement}% placement or more, and at most ${S.settings.coldDailyCap} campaign emails a day. A reply stops that person's sequence.</p>`},
   campButtons:{t:'Campaign buttons',b:`<ul><li><b>Start sending / Pause</b>: switches this campaign on or off. Leads keep their place.</li><li><b>Send a test</b>: sends step 1, filled in for the newest lead, to one of your own inboxes with [TEST] in the subject.</li><li><b>Archive</b>: ends the campaign. Unsent leads are skipped and history stays.</li></ul>`},
   leadStatus:{t:'Lead statuses',b:`<ul><li><b>Review</b>: waiting for you. Approve to queue them.</li><li><b>Scheduled</b>: the next email goes out at its time.</li><li><b>Replied</b>, <b>Bounced</b>, <b>Unsubscribed</b>: stopped for good, and kept out of every campaign.</li><li><b>Finished</b>: got every step.</li><li><b>Needs a fix</b>: a variable was missing, or 5 tries failed. Open it to see why, fix it, then Retry.</li><li><b>Skipped</b>: you stopped it.</li></ul>`},
@@ -895,14 +1112,16 @@ $('#settingsForm').onsubmit=async e=>{
   NUMS.forEach(k=>body[k]=Number(f[k].value));
   if(f.openrouterKey.value.trim())body.openrouterKey=f.openrouterKey.value.trim();
   if(!body.requireDns&&S.settings.requireDns&&!confirm('Turn off the DNS safety gate? Unauthenticated domains will be allowed to send.'))return;
-  try{await api('/api/settings',{method:'PUT',body});$('#saveNote').textContent='Saved '+new Date().toLocaleTimeString();await load(false);fillSettings();toast('Settings saved. Values outside the safe range were adjusted.');}catch(err){toast(err.message);}
+  const done=busy(e.submitter||f.querySelector('button.primary.big'),'Saving…');
+  try{await api('/api/settings',{method:'PUT',body});$('#saveNote').textContent='Saved '+new Date().toLocaleTimeString();await load(false);fillSettings();toast('Settings saved. Any number outside its safe range was adjusted to fit.');}catch(err){fail(err.message,"Settings weren't saved");}
+  done();
 };
 $('#aiTestBtn').onclick=async e=>{
   const f=$('#settingsForm');
-  if(f.openrouterKey.value.trim()||f.aiModel.value.trim()!==S.settings.aiModel){await api('/api/settings',{method:'PUT',body:{aiModel:f.aiModel.value.trim(),...(f.openrouterKey.value.trim()?{openrouterKey:f.openrouterKey.value.trim()}:{})}}).catch(err=>toast(err.message));f.openrouterKey.value='';}
+  if(f.openrouterKey.value.trim()||f.aiModel.value.trim()!==S.settings.aiModel){await api('/api/settings',{method:'PUT',body:{aiModel:f.aiModel.value.trim(),...(f.openrouterKey.value.trim()?{openrouterKey:f.openrouterKey.value.trim()}:{})}}).catch(err=>fail(err.message));f.openrouterKey.value='';}
   e.target.disabled=true;e.target.textContent='Writing...';const out=$('#aiOut');out.classList.remove('hidden');out.textContent='Asking '+f.aiModel.value+'...';
   try{const r=await api('/api/ai-test',{method:'POST'});out.textContent=`Subject: ${r.subject}\n\n${r.body}\n\n(${r.model}${r.cost!=null?`, cost $${Number(r.cost).toFixed(5)}`:''})`;await load(false);fillSettings();}
-  catch(err){out.textContent='Failed: '+err.message;}
+  catch(err){out.textContent='Failed: '+err.message;fail(err.message,"The AI didn't write an email");}
   e.target.disabled=false;e.target.textContent='Write a test email';
 };
 
@@ -984,7 +1203,7 @@ const STATUS_CLS={review:'warn',queued:'info',sending:'info',replied:'good',boun
 const DAYS=[['1','Mon'],['2','Tue'],['3','Wed'],['4','Thu'],['5','Fri'],['6','Sat'],['7','Sun']];
 
 async function loadCampaigns(){
-  try{C.list=await api('/api/campaigns');}catch(e){toast(e.message);return;}
+  try{C.list=await api('/api/campaigns');}catch(e){fail(e.message);return;}
   if(C.cur){await openCampaign(C.cur.id,true);return;}
   renderCampList();
 }
@@ -1016,10 +1235,10 @@ $('#campBack').onclick=()=>{C.cur=null;C.selected.clear();loadCampaigns();};
 $('#newCampBtn').onclick=()=>{$('#newCampForm').reset();$('#newCampDlg').showModal();};
 $('#newCampCancel').onclick=()=>$('#newCampDlg').close();
 $('#newCampForm').onsubmit=async e=>{if(e.submitter?.value!=='save')return;e.preventDefault();
-  try{const r=await api('/api/campaigns',{method:'POST',body:Object.fromEntries(new FormData(e.target))});$('#newCampDlg').close();C.list=await api('/api/campaigns');await openCampaign(r.id);sub('add');}catch(err){toast(err.message);}};
+  try{const r=await api('/api/campaigns',{method:'POST',body:Object.fromEntries(new FormData(e.target))});$('#newCampDlg').close();C.list=await api('/api/campaigns');await openCampaign(r.id);sub('add');}catch(err){fail(err.message);}};
 
 async function openCampaign(id,keepSub){
-  try{C.cur=await api('/api/campaigns/'+id);}catch(e){toast(e.message);return;}
+  try{C.cur=await api('/api/campaigns/'+id);}catch(e){fail(e.message);return;}
   $('#campList').classList.add('hidden');$('#campView').classList.remove('hidden');
   const c=C.cur, st=c.stats;
   $('#campTitle').textContent=c.name; $('#campStatus').outerHTML=`<span id="campStatus">${campPill(c)}</span>`;
@@ -1040,17 +1259,19 @@ $('#campToggle').onclick=async()=>{const c=C.cur;const starting=c.status!=='acti
   if(starting){const ready=C.list.eligibility.filter(i=>c.sender_ids.includes(i.id)&&i.ok).length;
     if(!ready&&!confirm('None of this campaign\'s inboxes is ready for cold email yet, so nothing will send until one is. Start anyway?'))return;
     if(c.stats.counts.review&&!confirm(`${c.stats.counts.review} leads are still waiting for review and won't be sent until you approve them. Start?`))return;}
+  const done=busy($('#campToggle'),starting?'Starting…':'Pausing…');
   try{await api(`/api/campaigns/${c.id}/status`,{method:'POST',body:{status:starting?'active':'paused'}});
     toast(!starting?'Campaign paused':S.settings.paused?'Campaign on. It sends once you press Start warm-up at the top.':!c.stats.total?'Campaign on. Add leads to give it something to send.':'Campaign started');}
-  catch(e){toast(e.message,8000);} openCampaign(c.id,true);};
+  catch(e){fail(e.message,starting?"The campaign didn't start":"Couldn't pause the campaign");} done(); openCampaign(c.id,true);};
 $('#campArchive').onclick=async()=>{if(!confirm(`Archive "${C.cur.name}"? Unsent leads are skipped. Sent history stays.`))return;await api('/api/campaigns/'+C.cur.id,{method:'DELETE'});C.cur=null;loadCampaigns();};
 $('#campTestBtn').onclick=async()=>{const own=S.inboxes.map(i=>i.email);const to=prompt('Send step 1 as a test to which of your inboxes?\n'+own.join('\n'),own[0]||'');if(!to)return;
-  try{const r=await api(`/api/campaigns/${C.cur.id}/test`,{method:'POST',body:{to:to.trim()}});toast(`Test sent from ${r.from} to ${r.to}`);}catch(e){toast(e.message);}};
+  const done=busy($('#campTestBtn'),'Sending…');
+  try{const r=await api(`/api/campaigns/${C.cur.id}/test`,{method:'POST',body:{to:to.trim()}});toast(`Test sent from ${r.from} to ${r.to}`);}catch(e){fail(e.message,"The test wasn't sent");} done();};
 
 // Leads
 async function loadLeads(){
   const c=C.cur, q=$('#leadSearch').value.trim();
-  const r=await api(`/api/campaigns/${c.id}/leads?limit=300${C.leadStatus?'&status='+C.leadStatus:''}${q?'&q='+encodeURIComponent(q):''}`).catch(e=>{toast(e.message);return{rows:[],total:0};});
+  const r=await api(`/api/campaigns/${c.id}/leads?limit=300${C.leadStatus?'&status='+C.leadStatus:''}${q?'&q='+encodeURIComponent(q):''}`).catch(e=>{fail(e.message);return{rows:[],total:0};});
   const counts=c.stats.counts;
   $('#leadChips').innerHTML=`<button class="chip" data-st="" aria-pressed="${!C.leadStatus}">All ${c.stats.total}</button>`+Object.keys(STATUS_LABEL).filter(k=>counts[k]).map(k=>`<button class="chip" data-st="${k}" aria-pressed="${C.leadStatus===k}">${STATUS_LABEL[k]} ${counts[k]}</button>`).join('');
   $('#leadTable').innerHTML=`<tr><th><input type="checkbox" id="leadAll"></th><th>Lead</th><th>Status</th><th class="hide-sm">Step</th><th class="hide-sm">Next send</th><th class="hide-sm">Inbox</th></tr>`+
@@ -1068,13 +1289,13 @@ $('#leadTable').addEventListener('click',e=>{
   const tr=e.target.closest('[data-lead]');if(tr)openLead(Number(tr.dataset.lead));});
 $$('[data-bulk]').forEach(b=>b.onclick=async()=>{
   const a=b.dataset.bulk, c=C.cur; let body;
-  if(a==='approve-all'){if(!c.stats.counts.review)return toast('Nothing is waiting for review');if(!confirm(`Approve all ${c.stats.counts.review} leads in review?`))return;body={action:'approve',status:'review'};}
-  else{if(!C.selected.size)return toast('Select leads first');if(a==='delete'&&!confirm(`Delete ${C.selected.size} leads? Leads that were already emailed are kept.`))return;body={action:a,ids:[...C.selected]};}
-  try{const r=await api(`/api/campaigns/${c.id}/leads/action`,{method:'POST',body});toast(`${r.changed} lead${r.changed===1?'':'s'} updated`);C.selected.clear();openCampaign(c.id,true);}catch(e){toast(e.message);}});
+  if(a==='approve-all'){if(!c.stats.counts.review)return hint('Nothing is waiting for review');if(!confirm(`Approve all ${c.stats.counts.review} leads in review?`))return;body={action:'approve',status:'review'};}
+  else{if(!C.selected.size)return hint('Select leads first');if(a==='delete'&&!confirm(`Delete ${C.selected.size} leads? Leads that were already emailed are kept.`))return;body={action:a,ids:[...C.selected]};}
+  try{const r=await api(`/api/campaigns/${c.id}/leads/action`,{method:'POST',body});toast(`${r.changed} lead${r.changed===1?'':'s'} updated`);C.selected.clear();openCampaign(c.id,true);}catch(e){fail(e.message);}});
 
 // Lead dialog
 async function openLead(id){
-  let L;try{L=await api('/api/leads/'+id);}catch(e){return toast(e.message);}
+  let L;try{L=await api('/api/leads/'+id);}catch(e){return fail(e.message);}
   const dlg=$('#leadDlg');
   $('#leadBody').innerHTML=`<div class="row spread"><div><h2 style="margin:0">${esc(L.name||L.email)}</h2><div class="muted small">${esc(L.email)}${L.company?' · '+esc(L.company):''}${L.title?' · '+esc(L.title):''} · ${esc(L.campaign.name)}</div></div><span class="pill ${STATUS_CLS[L.status]}">${STATUS_LABEL[L.status]}</span></div>
     ${L.error?`<p class="small" style="color:var(--bad-text)">${esc(L.error)}</p>`:''}
@@ -1085,13 +1306,13 @@ async function openLead(id){
     <div class="row">${['review','failed','skipped'].includes(L.status)?`<button class="btn sm primary" data-la="approve">Approve</button>`:''}${['review','queued'].includes(L.status)?`<button class="btn sm" data-la="skip">Skip this lead</button>`:''}${L.preview.some(p=>!p.sent)?'<button class="btn sm primary" id="saveLeadEdits">Save edits</button>':''}</div>
     ${L.messages.length?`<h3 style="margin-top:14px">Sent</h3>${L.messages.map(m=>`<div class="mail" onclick="this.classList.toggle('open')"><b>${esc(m.subject)}</b> <span class="muted small">step ${m.step} · ${fmtTime(m.sent_at)} · ${esc(m.sender)}${m.clicks?` · ${m.clicks} click${m.clicks>1?'s':''}`:''}</span><pre>${esc(m.body)}</pre></div>`).join('')}`:''}`;
   $('#leadBody').onclick=async e=>{
-    const la=e.target.closest('[data-la]');if(la){await api(`/api/campaigns/${L.campaign.id}/leads/action`,{method:'POST',body:{action:la.dataset.la,ids:[L.id]}}).catch(err=>toast(err.message));dlg.close();openCampaign(L.campaign.id,true);return;}
+    const la=e.target.closest('[data-la]');if(la){await api(`/api/campaigns/${L.campaign.id}/leads/action`,{method:'POST',body:{action:la.dataset.la,ids:[L.id]}}).catch(err=>fail(err.message));dlg.close();openCampaign(L.campaign.id,true);return;}
     const rs=e.target.closest('[data-reset]');if(rs){const n=rs.closest('[data-n]').dataset.n;await api('/api/leads/'+L.id,{method:'PUT',body:{overrides:{[n]:null}}});openLead(L.id);return;}
     if(e.target.id==='saveLeadEdits'){const ov={};
       $$('#leadBody [data-n]').forEach(card=>{const n=card.dataset.n,p=L.preview.find(x=>x.n==n);const sj=card.querySelector('[data-f=subject]'),bd=card.querySelector('[data-f=body]');if(!sj)return;
         if(sj.value!==p.subject||bd.value!==p.body||L.overrides[n])ov[n]={subject:sj.value,body:bd.value};});
-      if(!Object.keys(ov).length)return toast('No changes');
-      try{await api('/api/leads/'+L.id,{method:'PUT',body:{overrides:ov}});toast('Saved for this lead');openLead(L.id);}catch(err){toast(err.message);}}
+      if(!Object.keys(ov).length)return hint('No changes');
+      try{await api('/api/leads/'+L.id,{method:'PUT',body:{overrides:ov}});toast('Saved for this lead');openLead(L.id);}catch(err){fail(err.message);}}
   };
   if(!dlg.open)dlg.showModal();
 }
@@ -1116,10 +1337,10 @@ $('#stepList').addEventListener('focusin',e=>{if(e.target.matches('[data-f=subje
 $('#stepList').addEventListener('click',e=>{const rm=e.target.closest('[data-rm]');if(!rm)return;C.cur.steps=readSteps().filter((_,k)=>k!=rm.dataset.rm);renderSteps();});
 $('#varChips').addEventListener('click',e=>{const b=e.target.closest('[data-var]');if(!b)return;const t=`{{${b.dataset.var}}}`,f=C.lastField;
   if(f&&document.body.contains(f)){const a=f.selectionStart??f.value.length;f.value=f.value.slice(0,a)+t+f.value.slice(f.selectionEnd??a);f.focus();f.selectionStart=f.selectionEnd=a+t.length;}else{navigator.clipboard?.writeText(t);toast('Copied '+t);}});
-$('#addStepBtn').onclick=()=>{const steps=readSteps();if(steps.length>=8)return toast('Up to 8 steps');steps.push({delay_days:3,same_thread:true,subject:'',body:'Hi {{first_name}},\n\n'});C.cur.steps=steps;renderSteps();};
-$('#saveSeqBtn').onclick=async()=>{try{await api('/api/campaigns/'+C.cur.id,{method:'PUT',body:{steps:readSteps()}});toast('Sequence saved');openCampaign(C.cur.id,true);}catch(e){toast(e.message);}};
-$('#previewBtn').onclick=async()=>{const r=await api(`/api/campaigns/${C.cur.id}/leads?limit=1`).catch(()=>({rows:[]}));if(!r.rows.length)return toast('Add a lead first to preview with real data');
-  await api('/api/campaigns/'+C.cur.id,{method:'PUT',body:{steps:readSteps()}}).catch(e=>toast(e.message));openLead(r.rows[0].id);};
+$('#addStepBtn').onclick=()=>{const steps=readSteps();if(steps.length>=8)return hint('Up to 8 steps');steps.push({delay_days:3,same_thread:true,subject:'',body:'Hi {{first_name}},\n\n'});C.cur.steps=steps;renderSteps();};
+$('#saveSeqBtn').onclick=async()=>{try{await api('/api/campaigns/'+C.cur.id,{method:'PUT',body:{steps:readSteps()}});toast('Sequence saved');openCampaign(C.cur.id,true);}catch(e){fail(e.message);}};
+$('#previewBtn').onclick=async()=>{const r=await api(`/api/campaigns/${C.cur.id}/leads?limit=1`).catch(()=>({rows:[]}));if(!r.rows.length)return hint('Add a lead first to preview with real data');
+  await api('/api/campaigns/'+C.cur.id,{method:'PUT',body:{steps:readSteps()}}).catch(e=>fail(e.message));openLead(r.rows[0].id);};
 
 // Schedule
 function renderSchedule(){
@@ -1135,7 +1356,7 @@ $('#schedForm').onsubmit=async e=>{e.preventDefault();const f=e.target;
   for(const k of ['signature','opt_out_line'])body[k]=f[k].value;
   for(const k of ['review','stop_on_reply','track_clicks','track_opens'])body[k]=f[k].checked;
   if(body.track_opens&&!C.cur.track_opens&&!confirm('Open tracking hurts deliverability on new domains. Turn it on anyway?'))return;
-  try{await api('/api/campaigns/'+C.cur.id,{method:'PUT',body});toast('Schedule saved');openCampaign(C.cur.id,true);}catch(err){toast(err.message);}};
+  try{await api('/api/campaigns/'+C.cur.id,{method:'PUT',body});toast('Schedule saved');openCampaign(C.cur.id,true);}catch(err){fail(err.message);}};
 
 // Add leads
 function renderAdd(){const c=C.cur;$('#ingestUrl').value=c.ingestUrl;
@@ -1156,9 +1377,9 @@ async function importRows(rows,source){
   let added=0,skipped=[];for(let i=0;i<rows.length;i+=1000){const r=await api(`/api/campaigns/${C.cur.id}/leads`,{method:'POST',body:{leads:rows.slice(i,i+1000),source}});added+=r.added;skipped=skipped.concat(r.skipped);}
   $('#importOut').innerHTML=`<div class="banner ${added?'good':'warn'}"><b>${added} added</b>${skipped.length?`, ${skipped.length} skipped<ul>${skipped.slice(0,20).map(s=>`<li>${esc(s.email)}: ${esc(s.reason)}</li>`).join('')}${skipped.length>20?`<li>and ${skipped.length-20} more</li>`:''}</ul>`:''}${added&&C.cur.review?'<div class="small">They are waiting in Review.</div>':''}</div>`;
   const id=C.cur.id;await openCampaign(id,true);}
-$('#csvImport').onclick=async()=>{if(!C.csvRows)return;$('#csvImport').disabled=true;try{await importRows(C.csvRows,'a CSV');$('#csvFile').value='';C.csvRows=null;}catch(e){toast(e.message);$('#csvImport').disabled=false;}};
+$('#csvImport').onclick=async()=>{if(!C.csvRows)return;$('#csvImport').disabled=true;try{await importRows(C.csvRows,'a CSV');$('#csvFile').value='';C.csvRows=null;}catch(e){fail(e.message);$('#csvImport').disabled=false;}};
 $('#pasteImport').onclick=async()=>{const rows=$('#pasteLeads').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const [email,first_name,...company]=l.split(/[,;\t]/).map(x=>x.trim());return{email,first_name,company:company.join(' ')};});
-  if(!rows.length)return;try{await importRows(rows,'a paste');$('#pasteLeads').value='';}catch(e){toast(e.message);}};
+  if(!rows.length)return;try{await importRows(rows,'a paste');$('#pasteLeads').value='';}catch(e){fail(e.message);}};
 
 // Replies
 let REPLIES=[];
@@ -1176,7 +1397,7 @@ setInterval(()=>{if(!$('#app').classList.contains('hidden')&&!document.hidden)ba
 // Do-not-email list
 async function loadSuppression(){const l=await api('/api/suppression').catch(()=>[]);
   $('#supList').innerHTML=l.length?`<table>${l.map(x=>`<tr><td>${esc(x.email)}</td><td class="muted">${esc(x.reason)}</td><td class="muted hide-sm">${fmtTime(x.at)}</td><td><button type="button" class="btn sm" data-unsup="${esc(x.email)}">Remove</button></td></tr>`).join('')}</table>`:'<p class="muted">Empty.</p>';}
-$('#supAddBtn').onclick=async()=>{const v=$('#supAdd').value.trim();if(!v)return;try{const r=await api('/api/suppression',{method:'POST',body:{emails:v}});toast(`${r.added} added`);$('#supAdd').value='';loadSuppression();}catch(e){toast(e.message);}};
+$('#supAddBtn').onclick=async()=>{const v=$('#supAdd').value.trim();if(!v)return;try{const r=await api('/api/suppression',{method:'POST',body:{emails:v}});toast(`${r.added} added`);$('#supAdd').value='';loadSuppression();}catch(e){fail(e.message);}};
 $('#supList').addEventListener('click',async e=>{const b=e.target.closest('[data-unsup]');if(!b)return;if(!confirm(`Allow emailing ${b.dataset.unsup} again?`))return;await api('/api/suppression/'+encodeURIComponent(b.dataset.unsup),{method:'DELETE'});loadSuppression();});
 </script>
 

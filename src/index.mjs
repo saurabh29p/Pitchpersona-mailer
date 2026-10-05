@@ -18,12 +18,14 @@ import path from "node:path";
 import http from "node:http";
 import crypto from "node:crypto";
 import dns from "node:dns/promises";
+import netSocket from "node:net";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import nodemailer from "nodemailer";
 import { ImapFlow } from "imapflow";
 import { createCampaigns } from "./campaigns.mjs";
 import { dkimVerdict } from "./dkim.mjs";
+import { errText, explainMailError, friendlyError, NET_RE } from "./explain.mjs";
 
 const DRY = process.env.DRY_RUN === "1";
 const ONCE = process.argv.includes("--once");
@@ -63,9 +65,11 @@ CREATE INDEX IF NOT EXISTS seen_recipient_day ON seen(recipient, day);
 CREATE INDEX IF NOT EXISTS reply_queue_due ON reply_queue(done, due_at);
 CREATE INDEX IF NOT EXISTS events_at ON events(at);
 CREATE INDEX IF NOT EXISTS events_inbox ON events(inbox, level, at);
+CREATE INDEX IF NOT EXISTS seen_time ON seen(seen_at);
 `);
 // The last Test login result: 1 passed, 0 failed, NULL not tested since the password was saved.
-for (const col of ["login_ok INTEGER", "login_at TEXT"]) { try { db.exec(`ALTER TABLE inboxes ADD COLUMN ${col}`); } catch { /* already there */ } }
+// login_smtp and login_imap keep what each server said ("ok" or its error), so the panel can explain it.
+for (const col of ["login_ok INTEGER", "login_at TEXT", "login_smtp TEXT", "login_imap TEXT"]) { try { db.exec(`ALTER TABLE inboxes ADD COLUMN ${col}`); } catch { /* already there */ } }
 
 // ── Settings ────────────────────────────────────────────────────────────────────
 // Every number has a hard range. Values outside it are clamped on save, so a typo can't
@@ -206,7 +210,7 @@ function saveInbox(input, id) {
   if (!row.smtp_host || !row.imap_host) throw new Error("SMTP and IMAP hosts are required for a custom provider");
   if (![row.smtp_port, row.imap_port].every((n) => Number.isInteger(n) && n > 0 && n < 65536)) throw new Error("Ports must be whole numbers, like 465 or 993");
   const password_enc = input.password ? encrypt(String(input.password).replace(/\s+/g, "")) : cur?.password_enc || "";
-  if (cur && input.password) db.prepare("UPDATE inboxes SET login_ok = NULL, login_at = NULL WHERE id = ?").run(cur.id);
+  if (cur && input.password) db.prepare("UPDATE inboxes SET login_ok = NULL, login_at = NULL, login_smtp = NULL, login_imap = NULL WHERE id = ?").run(cur.id);
   if (cur && input.password && String(cur.pause_reason || "").startsWith(AUTH_PAUSE))
     db.prepare("UPDATE inboxes SET pause_reason = ? WHERE id = ?").run("New app password saved. Press Resume to start again.", cur.id);
   if (cur) {
@@ -224,7 +228,10 @@ function saveInbox(input, id) {
     if (row.role === "sender") checkDomain(domainOf(email), true).catch(() => {});
   }
   transports.delete(email); if (cur) transports.delete(cur.email);
+  if (cur && ["smtp_host", "smtp_port", "imap_host", "imap_port"].some((k) => String(cur[k]) !== String(row[k])))
+    db.prepare("UPDATE inboxes SET login_ok = NULL, login_at = NULL, login_smtp = NULL, login_imap = NULL WHERE id = ?").run(id);
   event("info", email, cur ? "Inbox settings updated" : `Inbox added (${row.role})`);
+  checkReach({ inboxes: [getInbox(id)] }).catch(() => {});
   return getInbox(id);
 }
 
@@ -401,6 +408,69 @@ Reply with only JSON: {"subject": "...", "body": "..."}`;
   }
 }
 
+// ── Can this server reach the mail servers at all? ──────────────────────────────
+// A plain connection to each mail server's port. A host that blocks outgoing email (Railway
+// blocks SMTP on its Free, Trial and Hobby plans) then shows up as one clear reason, instead
+// of every login and send failing with a timeout. A failure is checked again every 5 minutes
+// and a pass every 30, so sending resumes by itself once the block is lifted.
+const NET_CHECK = !DRY && process.env.NET_CHECK !== "off";
+const reach = new Map();   // "host:port" -> { host, port, kind, ok, error, ms, at }
+const reachKey = (host, port) => `${host}:${port}`;
+const smtpReach = (i) => reach.get(reachKey(i.smtp_host, i.smtp_port));
+function probe(host, port, ms = 8000) {
+  return new Promise((resolve) => {
+    const t0 = Date.now(), sock = netSocket.connect({ host, port });
+    const done = (ok, error) => { sock.destroy(); resolve({ ok, error: error || null, ms: Date.now() - t0 }); };
+    sock.setTimeout(ms, () => done(false, "ETIMEDOUT"));
+    sock.once("connect", () => done(true));
+    sock.once("error", (e) => done(false, e.code || e.message));
+  });
+}
+function reachTargets(inboxes) {
+  const t = new Map();
+  for (const i of inboxes) {
+    if (i.smtp_host) t.set(reachKey(i.smtp_host, i.smtp_port), { host: i.smtp_host, port: i.smtp_port, kind: "smtp" });
+    if (i.imap_host) t.set(reachKey(i.imap_host, i.imap_port), { host: i.imap_host, port: i.imap_port, kind: "imap" });
+  }
+  return [...t.values()];
+}
+const blockedHere = (r) => r.kind === "smtp" && ON_RAILWAY ? "Railway blocks outgoing email on its Free, Trial and Hobby plans." : `${r.kind === "smtp" ? "Sending" : "Reading"} through it waits until it connects.`;
+async function checkReach({ force = false, inboxes = listInboxes(), retest = true } = {}) {
+  if (!NET_CHECK) return;
+  const due = reachTargets(inboxes).filter((t) => {
+    const p = reach.get(reachKey(t.host, t.port));
+    return force || !p || Date.now() - p.at > (p.ok ? 30 : 5) * 60000;
+  });
+  const passed = [];
+  await Promise.all(due.map(async (t) => {
+    const k = reachKey(t.host, t.port), prev = reach.get(k), r = await probe(t.host, t.port);
+    reach.set(k, { ...t, ...r, at: Date.now() });
+    if (!r.ok && (!prev || prev.ok)) event("error", null, `Can't connect to ${t.host} on port ${t.port} (${r.error}). ${blockedHere(t)}`);
+    if (r.ok && prev && !prev.ok) event("info", null, `${t.host} on port ${t.port} connects again`);
+    if (r.ok) passed.push(k);
+  }));
+  // Also right after a restart: a redeploy is what opens Railway's email ports.
+  if (retest && passed.length) retestAfterRecovery(passed);
+}
+// Logins that failed only because the server couldn't be reached are tested again once it can.
+// A failure for any other reason (a wrong password, say) waits for a person: repeated failed
+// sign-ins can get an account locked.
+const retesting = new Set();
+function retestAfterRecovery(keys) {
+  const list = listInboxes().filter((i) => {
+    if (i.login_ok !== 0 || !i.password_enc || retesting.has(i.id)) return false;
+    const failed = [["smtp", i.login_smtp, reachKey(i.smtp_host, i.smtp_port)], ["imap", i.login_imap, reachKey(i.imap_host, i.imap_port)]]
+      .filter(([, raw]) => raw && raw !== "ok");
+    // Every side that failed did so on the connection, and that connection works now.
+    return failed.length > 0 && failed.some(([, , k]) => keys.includes(k))
+      && failed.every(([kind, raw, k]) => /_blocked$/.test(explainMailError(kind, raw, i, { onRailway: ON_RAILWAY })?.code || "") && reach.get(k)?.ok);
+  });
+  if (!list.length) return;
+  event("info", null, `Testing ${list.length} login${list.length > 1 ? "s" : ""} again now that the mail server connects`);
+  list.forEach((i) => retesting.add(i.id));
+  (async () => { for (const i of list) { await testInbox(getInbox(i.id) || i).catch(() => {}); retesting.delete(i.id); } })();
+}
+
 // ── Sending ─────────────────────────────────────────────────────────────────────
 const transports = new Map();
 function transport(inbox) {
@@ -435,6 +505,14 @@ async function smtpSend(from, mail, { test = false } = {}) {
     const msg = String(e?.response || e?.message || e);
     if ((e?.code === "EENVELOPE" || /RCPT/i.test(e?.command || "")) && RECIPIENT_BAD.test(msg) && !/5\.7\.\d/.test(msg))
       throw Object.assign(e, { recipientRejected: true });
+    // The server couldn't be reached at all. That says nothing about this inbox, so it doesn't
+    // count toward pausing it; the inbox waits until the connection check passes again.
+    if (NET_RE.test(errText(e))) {
+      const k = reachKey(from.smtp_host, from.smtp_port), prev = reach.get(k);
+      reach.set(k, { host: from.smtp_host, port: from.smtp_port, kind: "smtp", ok: false, error: e.code || "ETIMEDOUT", ms: null, at: Date.now() });
+      if (!prev || prev.ok) event("error", null, `Can't connect to ${from.smtp_host} on port ${from.smtp_port}. ${blockedHere({ kind: "smtp" })}`);
+      throw e;
+    }
     const streak = db.prepare("UPDATE inboxes SET error_streak = error_streak + 1 WHERE id = ? RETURNING error_streak").get(from.id).error_streak;
     if (HARD_STOP.test(msg)) pauseInbox(from, `the provider refused a send: "${msg.slice(0, 160)}"`);
     else if (streak >= 3) pauseInbox(from, `3 sends failed in a row. Last error: "${msg.slice(0, 160)}"`);
@@ -475,6 +553,13 @@ async function blockedReason(s, inbox) {
     if (!d.ok && d.error) return d.error;
     if (!d.ok) return `DNS not ready: missing ${["SPF", "DKIM", "DMARC"].filter((k) => !d[k.toLowerCase()]).join(", ")}`;
   }
+  if (DRY) return null;
+  const r = smtpReach(inbox);
+  if (r && !r.ok) return `Can't connect to ${r.host} on port ${r.port}. ${ON_RAILWAY ? "Railway blocks outgoing email on its Free, Trial and Hobby plans; upgrade to Pro." : "Sending waits until it connects."}`;
+  if (inbox.login_ok === 0) {
+    const x = explainMailError("smtp", inbox.login_smtp, inbox, { onRailway: ON_RAILWAY }) || explainMailError("imap", inbox.login_imap, inbox, { onRailway: ON_RAILWAY });
+    return `Its last login test failed${x ? `: ${x.why.replace(/\.$/, "")}` : ""}. Fix it, then press Test login.`;
+  }
   return null;
 }
 
@@ -495,6 +580,21 @@ function startBlock(all = listInboxes()) {
   if (!senders.length) return "Add at least one sending inbox. Seeds only receive and reply.";
   if (all.length < 2) return "Add at least one more inbox. Warm-up sends between your own inboxes, so a single inbox has no one to write to.";
   if (!DRY && !senders.some((i) => i.password_enc)) return "Save an app password for at least one sending inbox.";
+  if (DRY) return null;
+  // Honest about the network and the logins too: switching on can't help while none of them works.
+  const usable = senders.filter((i) => i.password_enc);
+  const cut = usable.map(smtpReach).filter((r) => r && !r.ok);
+  if (cut.length === usable.length) {
+    const r = cut[0];
+    return ON_RAILWAY
+      ? `Railway is blocking outgoing email, so no inbox can send. The mailer can't connect to ${r.host} on port ${r.port}: Railway allows sending email only on its Pro plan. Upgrade the Railway workspace to Pro, then redeploy the mailer in Railway.`
+      : `This server can't connect to ${r.host} on port ${r.port}, so no inbox can send. Check the server settings, or allow outgoing connections on port ${r.port}, then press Re-check connection.`;
+  }
+  if (usable.every((i) => i.login_ok === 0)) {
+    const i = usable[0];
+    const x = explainMailError("smtp", i.login_smtp, i, { onRailway: ON_RAILWAY }) || explainMailError("imap", i.login_imap, i, { onRailway: ON_RAILWAY });
+    return `None of your sending inboxes can sign in yet${x ? `. ${i.email}: ${x.why} ${x.fix}` : ". The Inboxes tab shows why for each one."}`;
+  }
   return null;
 }
 
@@ -516,7 +616,7 @@ async function sendPhase(s, pool, force) {
     try {
       const email = await writeEmail(s, { from, to, topic: pickOne(s.topics) });
       await send(s, { from, to, ...email, depth: 0 });
-    } catch (e) { if (e.code !== "PAUSED") event("error", from.email, `Send failed: ${String(e.message).slice(0, 250)}`); }
+    } catch (e) { if (e.code !== "PAUSED") event("error", from.email, `Send failed: ${friendlyError("smtp", e, from, { onRailway: ON_RAILWAY })}`); }
   });
 }
 
@@ -618,8 +718,8 @@ async function readPhase(s, pool) {
   await eachLimit(readable, 8, (inbox) =>
     readInbox(s, inbox, pool).then((ok) => { if (ok) scanned.add(inbox.id); }).catch((e) => {
       // A rejected login won't fix itself; stop retrying a bad password every few minutes.
-      if (isAuthError(e)) { pauseInbox(inbox, `${AUTH_PAUSE}. Save a new one, then resume.`); db.prepare("UPDATE inboxes SET login_ok = 0, login_at = ? WHERE id = ?").run(new Date().toISOString(), inbox.id); }
-      else event("error", inbox.email, `Reading the inbox failed: ${imapError(e)}`);
+      if (isAuthError(e)) { pauseInbox(inbox, `${AUTH_PAUSE}. Save a new one, then resume.`); db.prepare("UPDATE inboxes SET login_ok = 0, login_at = ?, login_imap = ? WHERE id = ?").run(new Date().toISOString(), errText(e), inbox.id); }
+      else event("error", inbox.email, `Reading the inbox failed: ${friendlyError("imap", e, inbox, { onRailway: ON_RAILWAY })}`);
     }));
   return scanned;
 }
@@ -642,7 +742,7 @@ async function replyPhase(s, force) {
       await send(s, { from, to, ...email, inReplyTo: row.message_id, threadRoot: row.thread_root, depth: row.depth + 1 });
     } catch (e) {
       if (e.code === "PAUSED") db.prepare("UPDATE reply_queue SET done = 0 WHERE message_id = ?").run(row.message_id);
-      else event("error", from.email, `Reply failed: ${String(e.message).slice(0, 250)}`);
+      else event("error", from.email, `Reply failed: ${friendlyError("smtp", e, from, { onRailway: ON_RAILWAY })}`);
     }
   }
   // Replies that waited more than two days are dropped; a late reply looks odd.
@@ -650,22 +750,64 @@ async function replyPhase(s, force) {
 }
 
 // ── Scheduler ───────────────────────────────────────────────────────────────────
-const state = { running: false, lastTickAt: null, nextTickAt: null, timer: null };
+// phase says what a running cycle is doing right now; lastCycle sums up the one before.
+const state = { running: false, phase: null, runningSince: null, forced: false, lastTickAt: null, nextTickAt: null, lastCycle: null, timer: null };
 let stopping = false;
 async function tick({ force = false } = {}) {
   if (state.running || stopping) return false;
   const s = getSettings();
   housekeeping();
-  if (s.paused && !DRY) return false;
-  state.running = true;
+  if (s.paused && !DRY) { checkReach().catch(() => {}); return false; }
+  state.running = true; state.forced = force; state.runningSince = new Date().toISOString(); state.phase = "connecting";
+  let failed = null;
   try {
+    await checkReach();      // so a blocked mail server is known before anything tries to send through it
+    state.phase = "reading";
     const scanned = await readPhase(s, listInboxes());
+    state.phase = "replying";
     await replyPhase(s, force);
+    state.phase = "sending";
     await sendPhase(s, listInboxes(), force);
+    state.phase = "campaigns";
     await camp.sendPhase(getSettings(), listInboxes(), scanned);
-  } finally { state.running = false; state.lastTickAt = new Date().toISOString(); }
+  } catch (e) { failed = e; throw e; } finally {
+    try { state.lastCycle = await cycleSummary(state.runningSince, force, failed); } catch (e) { console.error("Couldn't sum up the cycle:", e.message); }
+    state.running = false; state.phase = null; state.lastTickAt = new Date().toISOString();
+  }
   return true;
 }
+
+// What the last cycle did, and when it sent nothing, why not.
+async function cycleSummary(startedAt, force, failed) {
+  const s = getSettings(), c = (sql) => db.prepare(sql).get(startedAt).c;
+  const sum = {
+    startedAt, finishedAt: new Date().toISOString(), forced: force,
+    sent: c("SELECT COUNT(*) c FROM sent WHERE sent_at >= ? AND depth = 0"),
+    replies: c("SELECT COUNT(*) c FROM sent WHERE sent_at >= ? AND depth > 0"),
+    campaign: c("SELECT COUNT(*) c FROM messages WHERE sent_at >= ?"),
+    checked: c("SELECT COUNT(*) c FROM seen WHERE seen_at >= ?"),
+    errorSamples: db.prepare("SELECT inbox, message FROM events WHERE level = 'error' AND at >= ? ORDER BY at DESC LIMIT 3").all(startedAt),
+    errors: c("SELECT COUNT(*) c FROM events WHERE level = 'error' AND at >= ?"),
+    failed: failed ? String(failed.message || failed).slice(0, 200) : null, note: null,
+  };
+  if (sum.sent + sum.replies + sum.campaign > 0 || failed) return sum;
+  const now = localParts(new Date(), s.timezone);
+  const senders = listInboxes().filter((i) => i.role === "sender"), ready = [];
+  let firstBlock = null;
+  for (const i of senders) { const why = await blockedReason(s, i); if (!why) ready.push(i); else firstBlock ||= `${i.email}: ${why}`; }
+  const left = ready.reduce((n, i) => n + Math.max(0, dailyTarget(i, s).target - sentToday(i.email, now.day)), 0);
+  if (!DRY && !force && !inWindow(s, now)) sum.note = `It's outside sending hours (${s.startHour}:00 to ${s.endHour}:00, ${s.timezone}), so this cycle only read the inboxes.`;
+  else if (!ready.length) sum.note = `No inbox could send. ${firstBlock || "Add a sending inbox."}`;
+  else if (!left) sum.note = "Every inbox has sent today's planned emails. More go out tomorrow.";
+  else if (!force) sum.note = `Nothing was due this time. Today's ${left} remaining email${left > 1 ? "s are" : " is"} spread across working hours, so many cycles send none.`;
+  else sum.note = "Nothing could be sent. The errors below say why.";
+  return sum;
+}
+const schedulerInfo = () => {
+  const s = getSettings();
+  return { running: state.running, phase: state.phase, runningSince: state.runningSince, forced: state.forced, lastTickAt: state.lastTickAt,
+    nextTickAt: state.nextTickAt, lastCycle: state.lastCycle, tickMinutes: s.tickMinutes, inWindow: inWindow(s, localParts(new Date(), s.timezone)) };
+};
 
 // Once an hour: drop old activity and finished reply jobs, and keep the query planner's statistics fresh.
 let lastHousekeeping = 0;
@@ -702,9 +844,9 @@ export async function overview() {
       id: i.id, email: i.email, name: i.name, role: i.role, provider: i.provider, smtp_host: i.smtp_host, smtp_port: i.smtp_port,
       imap_host: i.imap_host, imap_port: i.imap_port, dkim_selector: i.dkim_selector, start_date: i.start_date, cap: i.cap,
       paused: !!i.paused, pause_reason: i.pause_reason, hasPassword: !!i.password_enc, day: dayN, targetToday: target, slowed,
-      login: i.login_ok == null ? null : i.login_ok ? "ok" : "failed", loginAt: i.login_at,
+      login: i.login_ok == null ? null : i.login_ok ? "ok" : "failed", loginAt: i.login_at, loginDetail: loginDetail(i),
       coldOk: i.role === "sender" ? (await camp.coldStatus(s, i)).ok : false,
-      sentToday: db.prepare("SELECT COUNT(*) c FROM sent WHERE sender = ? AND day = ?").get(i.email, today).c,
+      sentToday: db.prepare("SELECT COUNT(*) c FROM sent WHERE sender = ? AND day = ?").get(i.email, today).c, newToday: sentToday(i.email, today),
       sent7d: db.prepare("SELECT COUNT(*) c FROM sent WHERE sender = ? AND day >= ?").get(i.email, since7).c,
       received7d: db.prepare("SELECT COUNT(*) c FROM seen WHERE recipient = ? AND day >= ?").get(i.email, since7).c,
       placement7d: p7.pct, checked7d: p7.checked, inbox7d: p7.inbox, errors7d: errors7, health,
@@ -722,13 +864,15 @@ export async function overview() {
     domains.push({ ...(await checkDomain(d)), signing: db.prepare("SELECT result, via, at FROM dkim_seen WHERE domain = ?").get(d) || null });
   const tot7 = daily.slice(-7).reduce((a, d) => ({ inbox: a.inbox + d.inbox, spam: a.spam + d.spam, sent: a.sent + d.sent }), { inbox: 0, spam: 0, sent: 0 });
   const { openrouterKeyEnc, ...pub } = s;
-  const readiness = { startBlock: startBlock(), senders: inboxes.filter((i) => i.role === "sender").length,
-    readySenders: inboxes.filter((i) => i.role === "sender" && !i.blocked).length };
+  const readySenders = inboxes.filter((i) => i.role === "sender" && !i.blocked);
+  const readiness = { startBlock: startBlock(), senders: inboxes.filter((i) => i.role === "sender").length, readySenders: readySenders.length,
+    plannedToday: readySenders.reduce((n, i) => n + i.targetToday, 0), newToday: readySenders.reduce((n, i) => n + Math.min(i.targetToday, i.newToday), 0) };
   return {
     readiness,
     now: new Date().toISOString(), today, dry: DRY, storage: { persistent: PERSISTENT, dataDir: DATA_DIR }, settings: { ...pub, aiKeySet: !!openrouterKey(s), aiKeyFromEnv: !openrouterKeyEnc && !!process.env.OPENROUTER_API_KEY },
     limits: Object.fromEntries(Object.entries(SETTINGS).filter(([, v]) => typeof v.def === "number").map(([k, v]) => [k, [v.min, v.max]])),
-    scheduler: { running: state.running, lastTickAt: state.lastTickAt, nextTickAt: state.nextTickAt, inWindow: inWindow(s, localParts(new Date(), s.timezone)) },
+    scheduler: schedulerInfo(),
+    network: { onRailway: ON_RAILWAY, checking: NET_CHECK, results: [...reach.values()].map(({ host, port, kind, ok, error, at }) => ({ host, port, kind, ok, error, at: new Date(at).toISOString() })) },
     totals: { sentToday: daily.at(-1).sent, repliesToday: daily.at(-1).replies, sent7d: tot7.sent, placement7d: tot7.inbox + tot7.spam ? Math.round((100 * tot7.inbox) / (tot7.inbox + tot7.spam)) : null, rescued7d: tot7.spam,
       queued: db.prepare("SELECT COUNT(*) c FROM reply_queue WHERE done = 0").get().c,
       sentEver: db.prepare("SELECT COUNT(*) c FROM sent").get().c, seenEver: db.prepare("SELECT COUNT(*) c FROM seen").get().c },
@@ -779,15 +923,29 @@ function readJson(req) {
 }
 
 const isAuthError = (e) => e?.authenticationFailed || /AUTHENTICATIONFAILED|Invalid credentials|LOGIN failed/i.test(String(e?.responseText || e?.message));
-const imapError = (e) => (isAuthError(e) ? "the password was rejected" : String(e?.responseText || e?.message || e)).slice(0, 250);
+
+// Each side of the last login test, with the reason and the fix when it failed.
+function loginDetail(i) {
+  if (i.login_ok == null) return null;
+  const one = (kind, raw) => (raw == null ? null : raw === "ok" ? { ok: true } : { ok: false, ...explainMailError(kind, raw, i, { onRailway: ON_RAILWAY }) });
+  return { smtp: one("smtp", i.login_smtp), imap: one("imap", i.login_imap) };
+}
 
 async function testInbox(i) {
+  await checkReach({ force: true, inboxes: [i], retest: false });
   const out = { smtp: null, imap: null };
-  try { transports.delete(i.email); await transport(i).verify(); out.smtp = "ok"; } catch (e) { out.smtp = String(e.message).slice(0, 200); }
-  try { await withImap(i, async (c) => { await c.list(); }, Math.min(60000, IMAP_DEADLINE_MS)); out.imap = "ok"; } catch (e) { out.imap = imapError(e); }
-  db.prepare("UPDATE inboxes SET login_ok = ?, login_at = ? WHERE id = ?").run(out.smtp === "ok" && out.imap === "ok" ? 1 : 0, new Date().toISOString(), i.id);
-  event(out.smtp === "ok" && out.imap === "ok" ? "info" : "error", i.email, `Login test: SMTP ${out.smtp === "ok" ? "ok" : "failed"}, IMAP ${out.imap === "ok" ? "ok" : "failed"}`);
-  return out;
+  // A server that can't be reached would only time out after 20 seconds, so say so straight away.
+  const cut = (host, port) => { const r = reach.get(reachKey(host, port)); return r && !r.ok ? `connect ${r.error} ${host}:${port}` : null; };
+  out.smtp = cut(i.smtp_host, i.smtp_port);
+  if (!out.smtp) try { transports.delete(i.email); await transport(i).verify(); out.smtp = "ok"; } catch (e) { out.smtp = errText(e); }
+  out.imap = cut(i.imap_host, i.imap_port);
+  if (!out.imap) try { await withImap(i, async (c) => { await c.list(); }, Math.min(60000, IMAP_DEADLINE_MS)); out.imap = "ok"; } catch (e) { out.imap = errText(e); }
+  const ok = out.smtp === "ok" && out.imap === "ok";
+  db.prepare("UPDATE inboxes SET login_ok = ?, login_at = ?, login_smtp = ?, login_imap = ? WHERE id = ?").run(ok ? 1 : 0, new Date().toISOString(), out.smtp, out.imap, i.id);
+  const detail = loginDetail({ ...i, login_ok: ok ? 1 : 0, login_smtp: out.smtp, login_imap: out.imap });
+  const says = [["Sending", detail.smtp], ["Reading", detail.imap]].filter(([, d]) => !d.ok).map(([k, d]) => `${k} failed: ${d.why}`).join(" ");
+  event(ok ? "info" : "error", i.email, ok ? "Login test passed: sending and reading both work" : `Login test failed. ${says}`);
+  return { ...out, ok, detail };
 }
 
 async function api(req, res, url) {
@@ -811,6 +969,12 @@ async function api(req, res, url) {
   if (m !== "GET" && req.headers["content-type"] !== "application/json") return reply(415, { error: "JSON only" });
   if (p === "/api/logout" && m === "POST") { res.setHeader("set-cookie", "ww=; Path=/; Max-Age=0"); return reply(200, { ok: true }); }
   if (p === "/api/state" && m === "GET") return reply(200, await overview());
+  // Cheap enough to poll every couple of seconds while a cycle runs.
+  if (p === "/api/status" && m === "GET") return reply(200, { paused: getSettings().paused, scheduler: schedulerInfo() });
+  if (p === "/api/net-check" && m === "POST") {
+    await checkReach({ force: true });
+    return reply(200, { results: [...reach.values()].map(({ host, port, kind, ok, error }) => ({ host, port, kind, ok, error })), startBlock: startBlock() });
+  }
   if (p === "/api/mail" && m === "GET") return reply(200, recentMail(Number(url.searchParams.get("limit") || 50), url.searchParams.get("inbox")));
   if (p === "/api/settings" && m === "PUT") {
     const before = getSettings().tickMinutes;
@@ -820,6 +984,7 @@ async function api(req, res, url) {
   }
   if (p === "/api/pause" && m === "POST") {
     const { paused } = await readJson(req);
+    if (!paused) await checkReach({ force: true });
     const why = paused ? null : startBlock();
     if (why) return reply(400, { error: why, code: "not_ready" });
     saveSettings({ paused: !!paused }); event("info", null, paused ? "Warm-up paused" : "Warm-up started");
@@ -830,10 +995,11 @@ async function api(req, res, url) {
     if (getSettings().paused) return reply(400, { error: "Press Start warm-up first" });
     const why = startBlock();
     if (why) return reply(400, { error: why, code: "not_ready" });
-    if (state.running) return reply(409, { error: "A cycle is already running. Check Activity in a minute." });
-    tick({ force: true }).catch((e) => event("error", null, e.message));
+    if (state.running) return reply(409, { error: "A cycle is already running. The bar at the top shows its progress.", running: true });
+    const startedAt = new Date().toISOString();
     event("info", null, "Manual cycle started (ignores working hours, still respects every limit)");
-    return reply(200, { ok: true });
+    tick({ force: true }).catch((e) => event("error", null, `Cycle failed: ${e.message}`));
+    return reply(200, { ok: true, startedAt });
   }
   if (p === "/api/dns-check" && m === "POST") {
     const ds = [...new Set(listInboxes().filter((i) => i.role === "sender").map((i) => domainOf(i.email)))];

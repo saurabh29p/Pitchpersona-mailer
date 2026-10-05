@@ -6,6 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import { execFileSync } from "node:child_process";
 import dgram from "node:dgram";
 import tls from "node:tls";
+import net from "node:net";
 import fs from "node:fs"; import os from "node:os"; import path from "node:path";
 import { startEngine, client, checker, sleep } from "./helpers.mjs";
 import { startMocks } from "./mocks.mjs";
@@ -63,7 +64,7 @@ const day = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10
     dns.send(r, from.port, from.address);
   });
   await new Promise((r) => dns.bind(0, "127.0.0.1", r));
-  const e = await startEngine({ PANEL_PASSWORD: "pw", DNS_SERVERS: `127.0.0.1:${dns.address().port}` });
+  const e = await startEngine({ PANEL_PASSWORD: "pw", DNS_SERVERS: `127.0.0.1:${dns.address().port}`, NET_CHECK: "off" });
   const db = new DatabaseSync(e.dbPath);
   try {
     const { api } = client(e.url); await api("/api/login", "POST", { password: "pw" });
@@ -106,23 +107,28 @@ if (haveCert) {
     s.on("error", () => {});
   });
   await new Promise((r) => stall.listen(0, "127.0.0.1", r));
+  // A sending server that answers at once and turns everything away.
+  const refuse = net.createServer((s) => { s.on("error", () => {}); s.end("554 5.3.2 Not accepting mail\r\n"); });
+  await new Promise((r) => refuse.listen(0, "127.0.0.1", r));
   const e = await startEngine({ PANEL_PASSWORD: "pw", NODE_TLS_REJECT_UNAUTHORIZED: "0", IMAP_DEADLINE_MS: "1500" });
   try {
     const { api, waitIdle } = client(e.url); await api("/api/login", "POST", { password: "pw" });
     await api("/api/settings", "PUT", { requireDns: false });
     const mk = (email) => api("/api/inboxes", "POST", { email, role: "sender", provider: "custom", password: "good-pass", paused: true,
-      smtp_host: "127.0.0.1", smtp_port: 9, imap_host: "127.0.0.1", imap_port: stall.address().port, start_date: day(1) });
+      smtp_host: "127.0.0.1", smtp_port: refuse.address().port, imap_host: "127.0.0.1", imap_port: stall.address().port, start_date: day(1) });
     const A = (await mk("slow1@stall.test")).body.id; await mk("slow2@stall.test");
     const t0 = Date.now();
     const test = await api(`/api/inboxes/${A}/test`, "POST", {});
     ok(/didn't finish within 2 seconds/.test(test.body.imap) && Date.now() - t0 < 10000, "Test login on a mail server that stops answering gives up and says so", JSON.stringify(test.body));
     await api("/api/pause", "POST", { paused: false });
     await sleep(300);
+    const live = (await api("/api/status")).body.scheduler;
+    ok(live.running && live.phase === "reading" && live.runningSince, "while a cycle waits on a mail server, the status says it's reading the inboxes", JSON.stringify(live));
     const t1 = Date.now(); await waitIdle();
     ok(Date.now() - t1 < 10000, "a cycle doesn't hang on a mail server that stops answering", `${Date.now() - t1}ms`);
     const ev = (await api("/api/state")).body.events.map((x) => x.message).join("\n");
     ok(/Reading the inbox failed: the mail server didn't finish within 2 seconds/.test(ev), "...and Activity says that inbox was skipped this cycle", ev.slice(0, 300));
-  } finally { e.stop(); stall.close(); }
+  } finally { e.stop(); stall.close(); refuse.close(); }
 
   // A mailbox with more new mail than one batch is read over several cycles.
   const mocks = await startMocks({ key, cert });
