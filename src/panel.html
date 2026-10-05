@@ -741,7 +741,7 @@ function render(){
       <td class="hide-sm">${i.role==='seed'?'–':i.day||'starts '+shortDay(i.start_date)}</td>
       <td>${i.role==='seed'?`<span class="muted small">${i.received7d} received 7d</span>`:`${i.sentToday} / ${i.targetToday}<div class="meter"><i style="width:${i.targetToday?Math.min(100,100*i.sentToday/i.targetToday):0}%"></i></div>`}</td>
       <td>${i.placement7d==null?'<span class="muted small">no data</span>':`<b>${i.placement7d}%</b> <span class="muted small">${i.inbox7d}/${i.checked7d}</span>`}</td>
-      <td class="hide-sm">${i.health==null?'<span class="muted small">–</span>':`<span class="pill ${i.health>=90?'good':i.health>=75?'warn':'bad'}">${i.health}</span>`}</td></tr>`).join('')
+      <td class="hide-sm">${i.health==null?'<span class="muted small">–</span>':`<span class="pill ${i.health>=90?'good':i.health>=75?'warn':'bad'}" title="Placement over 7 days, minus 3 for each error since its last passing login test">${i.health}</span>`}</td></tr>`).join('')
     :`<tr><td colspan="6" class="muted">No inboxes yet.</td></tr>`);
 
   // Domains
@@ -835,8 +835,9 @@ function renderInboxCards(){
     <div class="row spread"><div><h3>${esc(i.email)}</h3><div class="muted small">${esc(i.name)} · ${i.role==='seed'?'Seed':'Sender'} · ${esc(i.provider)}</div></div>${statusPill(i)}</div>
     ${i.blocked&&!/^Its last login test failed/.test(i.blocked)?`<div class="small" style="color:${i.paused?'var(--warn-text)':'var(--bad-text)'}">${esc(i.blocked)}</div>`:''}
     ${loginBlock(i)}
+    ${i.capNote?`<div class="small" style="color:var(--warn-text)">${esc(i.capNote)}</div>`:''}
     ${i.role==='sender'?`<div class="chart" data-ramp="${i.id}"></div><div class="legend" style="margin:0"><span><i style="background:var(--s1)"></i>Sent</span><span><i style="background:var(--ref);height:2px"></i>Planned</span></div>`:''}
-    <dl class="kv"><dt>Warm-up day</dt><dd>${i.role==='seed'?'–':i.day||'starts '+shortDay(i.start_date)}</dd><dt>Sent 7d</dt><dd>${i.sent7d}</dd><dt>Received 7d</dt><dd>${i.received7d}</dd><dt>Errors 7d</dt><dd>${i.errors7d}</dd><dt>Sign-in</dt><dd>${i.signin==='google'?(S.google?'Google sign-in':'<span style="color:var(--bad-text)">Google sign-in, key missing</span>'):i.hasPassword?'App password (encrypted)':'<span style="color:var(--bad-text)">No app password</span>'}</dd></dl>
+    <dl class="kv"><dt>Warm-up day</dt><dd>${i.role==='seed'?'–':i.day||'starts '+shortDay(i.start_date)}</dd><dt>Sent 7d</dt><dd>${i.sent7d}</dd><dt>Received 7d</dt><dd>${i.received7d}</dd><dt>Errors 7d</dt><dd>${i.errors7d}${i.errorsFixed7d?` <span class="muted small" title="These came before its last passing login test, so they were setup problems that are fixed now. They don't lower its health.">(+${i.errorsFixed7d} fixed during setup)</span>`:''}</dd><dt>Sign-in</dt><dd>${i.signin==='google'?(S.google?'Google sign-in':'<span style="color:var(--bad-text)">Google sign-in, key missing</span>'):i.hasPassword?'App password (encrypted)':'<span style="color:var(--bad-text)">No app password</span>'}</dd></dl>
     <div class="acts">
       <button class="btn sm" data-act="pause" data-id="${i.id}">${i.paused?'Resume':'Pause'}</button>
       <button class="btn sm" data-act="test" data-id="${i.id}" ${testing.has(i.id)?'disabled':''}>${testing.has(i.id)?'<span class="spin"></span> Testing…':'Test login'}</button>
@@ -856,7 +857,7 @@ $('#inboxCards').addEventListener('click',async e=>{
   const done=busy(b,{pause:i.paused?'Resuming…':'Pausing…',send:'Writing and sending…',del:'Removing…'}[act]||'Working…');
   try{
     if(act==='pause'){await api('/api/inboxes/'+i.id,{method:'PUT',body:{paused:!i.paused}});toast(i.paused?`${i.email} resumed`:`${i.email} paused. It still reads its mail.`);}
-    if(act==='send'){const r=await api(`/api/inboxes/${i.id}/send-test`,{method:'POST'});notify({kind:'ok',title:`Sent from ${i.email} to ${r.to}`,msg:`"${r.subject}", written by ${r.by==='ai'?'the AI':'a template'}. Activity shows where it lands after the next cycle.`});}
+    if(act==='send'){const r=await api(`/api/inboxes/${i.id}/send-test`,{method:'POST'});notify({kind:'ok',title:`Sent from ${i.email} to ${r.to}`,msg:`"${r.subject}", written by ${r.by==='ai'?'the AI':'a template'}. That's ${r.sentToday} of today's ${r.target} warm-up emails for this inbox${r.sentToday>=r.target?', so it sends no more today':''}. Activity shows where it lands after the next cycle.`});}
     if(act==='del'){await api('/api/inboxes/'+i.id,{method:'DELETE'});toast(`${i.email} removed`);}
   }catch(err){fail(err.message,{pause:"Couldn't change this inbox",send:`Couldn't send from ${i.email}`,del:`Couldn't remove ${i.email}`}[act]);}
   done(); await load(false);

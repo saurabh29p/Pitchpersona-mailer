@@ -922,8 +922,17 @@ export async function overview() {
     const { dayN, target, slowed } = i.role === "sender" ? dailyTarget(i, s) : { dayN: null, target: 0, slowed: false };
     const p7 = placement(i.email, since7);
     const blocked = await blockedReason(s, i);
-    const errors7 = db.prepare("SELECT COUNT(*) c FROM events WHERE inbox = ? AND level = 'error' AND at >= ?").get(i.email, new Date(Date.now() - 7 * 86400000).toISOString()).c;
-    const health = p7.pct == null ? null : Math.max(0, Math.min(100, p7.pct - errors7 * 3));
+    const week = new Date(Date.now() - 7 * 86400000).toISOString();
+    const errorsSince = (since) => db.prepare("SELECT COUNT(*) c FROM events WHERE inbox = ? AND level = 'error' AND at >= ?").get(i.email, since).c;
+    // Errors from before the last passing login test were setup problems that are now fixed
+    // (a wrong password, a blocked port), so they no longer count against the inbox's health.
+    const errors7 = errorsSince(week);
+    const errorsNow = i.login_ok === 1 && i.login_at > week ? errorsSince(i.login_at) : errors7;
+    const health = p7.pct == null ? null : Math.max(0, Math.min(100, p7.pct - errorsNow * 3));
+    // An inbox's own cap below the ramp's stops it climbing, which is easy to set and forget.
+    const capNote = i.role === "sender" && i.cap && i.cap < s.rampCap
+      ? `Its own daily cap of ${i.cap} keeps it at ${i.cap} warm-up email${i.cap > 1 ? "s" : ""} a day for good. Without it, it would climb to ${s.rampCap} a day by day ${Math.ceil(Math.max(0, s.rampCap - s.rampStart) / s.rampPerDay) + 1}. Press Edit and clear "Own daily cap" to let it ramp.`
+      : null;
     inboxes.push({
       id: i.id, email: i.email, name: i.name, role: i.role, provider: i.provider, smtp_host: i.smtp_host, smtp_port: i.smtp_port,
       imap_host: i.imap_host, imap_port: i.imap_port, dkim_selector: i.dkim_selector, start_date: i.start_date, cap: i.cap,
@@ -934,7 +943,7 @@ export async function overview() {
       sentToday: db.prepare("SELECT COUNT(*) c FROM sent WHERE sender = ? AND day = ?").get(i.email, today).c, newToday: sentToday(i.email, today),
       sent7d: db.prepare("SELECT COUNT(*) c FROM sent WHERE sender = ? AND day >= ?").get(i.email, since7).c,
       received7d: db.prepare("SELECT COUNT(*) c FROM seen WHERE recipient = ? AND day >= ?").get(i.email, since7).c,
-      placement7d: p7.pct, checked7d: p7.checked, inbox7d: p7.inbox, errors7d: errors7, health,
+      placement7d: p7.pct, checked7d: p7.checked, inbox7d: p7.inbox, errors7d: errorsNow, errorsFixed7d: errors7 - errorsNow, health, capNote,
       status: blocked ? "blocked" : i.role === "seed" ? "seed" : slowed ? "slowed" : "active", blocked,
       daily: db.prepare(`SELECT day, COUNT(*) sent FROM sent WHERE sender = ? AND day >= ? GROUP BY day`).all(i.email, since30),
     });
@@ -1158,7 +1167,7 @@ async function api(req, res, url) {
       try {
         const email = await writeEmail(s, { from: i, to, topic: pickOne(s.topics) });
         await send(s, { from: i, to, ...email, depth: 0, test: true });
-        return reply(200, { to: to.email, subject: email.subject, by: email.by });
+        return reply(200, { to: to.email, subject: email.subject, by: email.by, sentToday: sentToday(i.email, localParts(new Date(), s.timezone).day), target });
       } catch (e) { return reply(400, { error: String(e.message).slice(0, 300) }); }
     }
   }

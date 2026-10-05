@@ -144,6 +144,13 @@ if (haveCert) {
     await runNow();
     mail = (await api("/api/mail")).body;
     ok(mail.some((m) => m.folder === "inbox"), "warm-up mail sent through the API is found on arrival over IMAP, so placement counts it", JSON.stringify(mail.map((m) => m.folder)));
+    const a0 = await inbox(A);
+    ok(a0.health === a0.placement7d && a0.errors7d === 0 && a0.errorsFixed7d > 0,
+      "errors from before the last passing login test don't lower health", JSON.stringify({ health: a0.health, p: a0.placement7d, e: a0.errors7d, fixed: a0.errorsFixed7d }));
+    await api(`/api/inboxes/${A}`, "PUT", { cap: 2 });
+    ok(/cap of 2 keeps it at 2/.test((await inbox(A)).capNote || ""), "an own cap below the ramp says it stops the inbox climbing", (await inbox(A)).capNote);
+    await api(`/api/inboxes/${A}`, "PUT", { cap: null });
+    ok((await inbox(A)).capNote === null, "...and clearing it removes the note");
     db.prepare("INSERT OR REPLACE INTO reply_queue (message_id, due_at, done) SELECT message_id, ?, 0 FROM seen").run(new Date(Date.now() - 60000).toISOString());
     await runNow();
     const reply = G.sent.find((m) => m.inReplyTo);
