@@ -61,6 +61,9 @@ if (haveCert) {
   const day = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
   try {
     const { api, waitIdle, runNow } = client(e.url); await api("/api/login", "POST", { password: "pw" });
+    const font = await fetch(e.url + "/assets/inter-latin-v1.woff2"), sneaky = await fetch(e.url + "/assets/..%2Findex.mjs");
+    ok(font.status === 200 && font.headers.get("content-type") === "font/woff2" && !/import /.test(await sneaky.text()),
+      "the web app's fonts and mark are served from a fixed list, and nothing else under /assets/");
     await api("/api/settings", "PUT", { requireDns: false, startHour: 0, endHour: 24, timezone: "UTC", linkUrl: "https://go.trypitchpersona.test" });
     const mk = (email, extra = {}) => api("/api/inboxes", "POST", { email, role: "sender", provider: "google", start_date: day(30),
       smtp_host: "127.0.0.1", smtp_port: BLOCKED, imap_host: "127.0.0.1", imap_port: mocks.imapPort, ...extra });

@@ -4,29 +4,49 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PitchPersona Mailer</title>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="/assets/mark-64.png">
+<script>try{const t=localStorage.getItem('ww-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;}catch{}</script>
+<link rel="preload" href="/assets/inter-latin-v1.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+/* The PitchPersona web app's own faces (frontend src/fonts.css), served by the mailer itself. */
+@font-face{font-family:'Inter';font-style:normal;font-weight:400 700;font-display:swap;src:url('/assets/inter-latin-v1.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Inter';font-style:normal;font-weight:400 700;font-display:swap;src:url('/assets/inter-latin-ext-v1.woff2') format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400 700;font-display:swap;src:url('/assets/jetbrains-mono-latin-v1.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+/* PitchPersona web app theme (frontend src/index.css, 2026-10-04): ink primary, violet accent,
+   Inter + JetBrains Mono, cards 16px, controls 8px. Light: near-white page, white cards.
+   Dark: neutral graphite. Follows the device until a choice is made in the sidebar. */
 :root{color-scheme:dark;
-  /* PitchPersona app theme (frontend src/index.css): dark by default, cream when light. */
-  --bg:#110E0B;--surface:#1A1612;--surface-2:#221C17;--line:#3A3129;--text:#F8F1E6;--text-2:#D9CCB8;--muted:#B2A48F;
-  --s1:#F2600F;--s2:#1FA89B;--good:#1FAE62;--good-text:#34D399;--warn:#F5A623;--warn-text:#FBBF24;--bad:#E5484D;--bad-text:#F87171;
-  --accent:#FF6A1A;--accent-ink:#1A0D04;--accent-text:#FF9A52;--grid:#2B241D;--ref:#9C8E79;--r:14px;
-  --grad:linear-gradient(135deg,#FF6A1A 0%,#FFB23E 100%)}
+  --bg:#0D0E12;--side:#14151A;--surface:#1A1B21;--surface-2:#22232A;--lav:#1F1A2E;--line:#2D2F37;--line-2:#3B3D47;
+  --text:#F9FAFB;--text-2:#D1D5DB;--muted:#A1A1AA;
+  --primary:#F9FAFB;--primary-hover:#E5E7EB;--on-primary:#111827;
+  --accent:#A78BFA;--accent-text:#C4B5FD;--accent-ink:#111827;--accent-soft:rgba(167,139,250,.14);
+  --s1:#A78BFA;--s2:#2DD4BF;--good:#4ADE80;--good-text:#4ADE80;--warn:#FCD34D;--warn-text:#FCD34D;--bad:#F87171;--bad-text:#F87171;
+  --grid:#26272E;--ref:#8B8B96;--r:16px;--rc:8px;
+  --grad:linear-gradient(135deg,#A78BFA 0%,#C4B5FD 100%);
+  --shadow:0 1px 0 rgba(255,255,255,.035) inset,0 1px 2px rgba(0,0,0,.28),0 8px 24px -12px rgba(0,0,0,.45);
+  --shadow-pop:0 12px 36px rgba(0,0,0,.45);
+  --font:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;--mono:'JetBrains Mono',ui-monospace,'SFMono-Regular',Menlo,monospace}
 @media (prefers-color-scheme:light){:root:where(:not([data-theme="dark"])){color-scheme:light;
-  --bg:#F6EEDF;--surface:#FFFBF3;--surface-2:#FFF7EA;--line:#E7D8C0;--text:#16120E;--text-2:#463B2F;--muted:#62554A;
-  --s1:#E0550B;--s2:#0B8F84;--good-text:#1E6640;--warn-text:#8A5610;--bad-text:#B23A30;--accent-text:#B5460A;--grid:#EFE3CF;--ref:#72655A}}
+  --bg:#F8F7FB;--side:#FFFFFF;--surface:#FFFFFF;--surface-2:#F6F4FA;--lav:#F3E8FF;--line:#E5E7EB;--line-2:#D1D5DB;
+  --text:#111827;--text-2:#4B5563;--muted:#646B78;
+  --primary:#111827;--primary-hover:#1F2937;--on-primary:#FFFFFF;
+  --accent:#6D28D9;--accent-text:#6D28D9;--accent-ink:#FFFFFF;--accent-soft:rgba(109,40,217,.08);
+  --s1:#7C3AED;--s2:#0F766E;--good:#16A34A;--good-text:#166534;--warn:#D97706;--warn-text:#7A4A0C;--bad:#DC2626;--bad-text:#9F2D23;
+  --grid:#EEECF3;--ref:#646B78;--grad:linear-gradient(135deg,#4C1D95 0%,#7C3AED 100%);
+  --shadow:0 1px 2px rgba(17,24,39,.05),0 10px 28px -14px rgba(17,24,39,.16);--shadow-pop:0 12px 36px rgba(17,24,39,.14)}}
 :root[data-theme="light"]{color-scheme:light;
-  --bg:#F6EEDF;--surface:#FFFBF3;--surface-2:#FFF7EA;--line:#E7D8C0;--text:#16120E;--text-2:#463B2F;--muted:#62554A;
-  --s1:#E0550B;--s2:#0B8F84;--good-text:#1E6640;--warn-text:#8A5610;--bad-text:#B23A30;--accent-text:#B5460A;--grid:#EFE3CF;--ref:#72655A}
+  --bg:#F8F7FB;--side:#FFFFFF;--surface:#FFFFFF;--surface-2:#F6F4FA;--lav:#F3E8FF;--line:#E5E7EB;--line-2:#D1D5DB;
+  --text:#111827;--text-2:#4B5563;--muted:#646B78;
+  --primary:#111827;--primary-hover:#1F2937;--on-primary:#FFFFFF;
+  --accent:#6D28D9;--accent-text:#6D28D9;--accent-ink:#FFFFFF;--accent-soft:rgba(109,40,217,.08);
+  --s1:#7C3AED;--s2:#0F766E;--good:#16A34A;--good-text:#166534;--warn:#D97706;--warn-text:#7A4A0C;--bad:#DC2626;--bad-text:#9F2D23;
+  --grid:#EEECF3;--ref:#646B78;--grad:linear-gradient(135deg,#4C1D95 0%,#7C3AED 100%);
+  --shadow:0 1px 2px rgba(17,24,39,.05),0 10px 28px -14px rgba(17,24,39,.16);--shadow-pop:0 12px 36px rgba(17,24,39,.14)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 "Plus Jakarta Sans",Inter,system-ui,sans-serif}
-h1,h2,.tile .val{font-family:"Space Grotesk","Plus Jakarta Sans",sans-serif;letter-spacing:-.01em}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 var(--font);-webkit-font-smoothing:antialiased}
+h1,h2,h3,.tile .val{letter-spacing:-.02em}
 button,input,select,textarea{font:inherit;color:inherit}
 .wrap{max-width:1100px;margin:0 auto;padding:16px}
-header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
-.hrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap;max-width:1100px;margin:0 auto;padding:12px 16px}
-h1{font-size:18px;margin:0;flex:1;min-width:150px}
 h2{font-size:17px;margin:0 0 8px}h3{font-size:15px;margin:0}
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 14px;cursor:pointer;white-space:nowrap}
 .btn:hover{border-color:var(--text-2)}.btn:disabled{opacity:.5;cursor:default}
@@ -35,9 +55,6 @@ h2{font-size:17px;margin:0 0 8px}h3{font-size:15px;margin:0}
 .brand{width:28px;height:28px;border-radius:8px;background:var(--grad);display:inline-grid;place-items:center;color:var(--accent-ink);font-weight:800;font-size:14px;margin-right:8px;vertical-align:middle}
 .btn.danger{color:var(--bad-text)}.btn.sm{padding:5px 10px;font-size:13px}
 .big{font-weight:600;padding:9px 18px}
-nav{display:flex;gap:4px;max-width:1100px;margin:0 auto;padding:0 16px;overflow-x:auto}
-nav button{border:0;background:none;padding:10px 12px;border-bottom:2px solid transparent;cursor:pointer;color:var(--text-2);white-space:nowrap}
-nav button[aria-selected=true]{color:var(--accent-text);border-color:var(--accent);font-weight:600}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin:0 0 16px}
 .grid{display:grid;gap:16px}.g4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
 .tile .lab{color:var(--text-2);font-size:13px}.tile .val{font-size:30px;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.2}
@@ -76,10 +93,10 @@ label.f input,label.f select,label.f textarea{background:var(--surface);border:1
 .mail pre{white-space:pre-wrap;font:13px/1.5 inherit;background:var(--surface-2);padding:10px;border-radius:8px;margin:8px 0 0;display:none}
 .mail.open pre{display:block}
 dialog{border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--text);padding:20px;width:min(640px,calc(100vw - 32px))}
-dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog::backdrop{background:rgba(17,24,39,.45);backdrop-filter:blur(2px)}
 /* Notifications: successes fade by themselves, problems stay until closed */
 #toasts{position:fixed;right:16px;bottom:16px;z-index:40;display:flex;flex-direction:column;gap:8px;width:min(400px,calc(100vw - 32px));pointer-events:none}
-.toast{pointer-events:auto;display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:4px 10px;align-items:start;background:var(--surface);color:var(--text);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:12px;padding:11px 12px;font-size:14px;box-shadow:0 12px 32px rgba(0,0,0,.35);animation:tin .18s ease-out}
+.toast{pointer-events:auto;display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:4px 10px;align-items:start;background:var(--surface);color:var(--text);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:12px;padding:11px 12px;font-size:14px;box-shadow:var(--shadow-pop);animation:tin .18s ease-out}
 .toast.ok{border-left-color:var(--good)}.toast.error{border-left-color:var(--bad)}.toast.warn{border-left-color:var(--warn)}
 .toast .ic{font-weight:700;line-height:1.4}.toast.ok .ic{color:var(--good-text)}.toast.error .ic{color:var(--bad-text)}.toast.warn .ic{color:var(--warn-text)}.toast.info .ic{color:var(--accent-text)}
 .toast .tt{font-weight:600}.toast .tb{color:var(--text-2);font-size:13px;margin-top:2px;overflow-wrap:anywhere}
@@ -117,8 +134,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 #login .card{width:min(380px,100%)}
 .subnav{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line)}
 .subnav button{border:0;background:none;padding:8px 12px;border-bottom:2px solid transparent;cursor:pointer;color:var(--text-2);white-space:nowrap}
-.subnav button[aria-selected=true]{color:var(--accent-text);border-color:var(--accent);font-weight:600}
-.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--text-2)}
+.sub.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--text-2)}
 .chip[aria-pressed=true]{border-color:var(--accent);color:var(--accent-text);font-weight:600}
 code{font-family:ui-monospace,monospace;font-size:12px;background:var(--surface-2);padding:1px 5px;border-radius:5px}
 tr.click{cursor:pointer}tr.click:hover td{background:var(--surface-2)}
@@ -134,8 +150,8 @@ a{color:var(--accent-text)}
 .stp:not(:last-child)::before{content:"";position:absolute;left:14px;top:32px;bottom:2px;width:2px;background:var(--line)}
 .stp.done:not(:last-child)::before{background:var(--good)}
 .stp .dot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;border:2px solid var(--line);background:var(--surface);color:var(--text-2);z-index:1}
-.stp.done .dot{background:var(--good);border-color:var(--good);color:#06180D}
-.stp.cur .dot{border-color:var(--accent);color:var(--accent-text);box-shadow:0 0 0 4px rgba(255,106,26,.2)}
+.stp.done .dot{background:var(--good);border-color:var(--good);color:var(--surface)}
+.stp.cur .dot{border-color:var(--accent);color:var(--accent-text);box-shadow:0 0 0 4px var(--accent-soft)}
 .stp.prob .dot{border-color:var(--bad);color:var(--bad-text)}
 .stp .sh{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;cursor:pointer;min-height:30px;background:none;border:0;padding:4px 0 0;text-align:left;width:100%}
 .stp .sh b{font-size:15px}.stp .st{display:block;font-size:13px;color:var(--muted);font-weight:400}
@@ -151,9 +167,9 @@ a{color:var(--accent-text)}
 .opt{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:0 7px;margin-left:6px;vertical-align:2px}
 .rec{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;font-size:13px;margin:6px 0}.rec dt{color:var(--text-2)}.rec dd{margin:0;word-break:break-all}
 /* Help where it's needed: "?" popovers and a "How to use this page" dropdown per tab */
-.qh{width:20px;height:20px;border-radius:50%;border:1px solid var(--line);background:var(--surface-2);color:var(--text-2);font:700 12px/1 "Plus Jakarta Sans",system-ui,sans-serif;cursor:pointer;display:inline-grid;place-items:center;padding:0;flex:none;vertical-align:2px;margin-left:6px}
+.qh{width:20px;height:20px;border-radius:50%;border:1px solid var(--line);background:var(--surface-2);color:var(--text-2);font:700 12px/1 var(--font);cursor:pointer;display:inline-grid;place-items:center;padding:0;flex:none;vertical-align:2px;margin-left:6px}
 .qh:hover,.qh[aria-expanded=true]{border-color:var(--accent);color:var(--accent-text)}
-.pop{position:fixed;z-index:30;width:min(340px,calc(100vw - 32px));background:var(--surface);color:var(--text);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;box-shadow:0 12px 32px rgba(0,0,0,.35);font-size:14px;line-height:1.5}
+.pop{position:fixed;z-index:30;width:min(340px,calc(100vw - 32px));background:var(--surface);color:var(--text);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow-pop);font-size:14px;line-height:1.5}
 .pop h4{margin:0;font-size:14px}.pop p{margin:6px 0 0}.pop ul,.pop ol{margin:6px 0 0;padding-left:18px}.pop li{margin:3px 0}
 .pop .x{border:0;background:none;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
 details.howto{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin:0 0 16px}
@@ -174,21 +190,101 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
 .flow b{display:block;margin-bottom:4px}.flow .n{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--grad);color:var(--accent-ink);font-size:12px;font-weight:700;margin-right:6px}
 .tl{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
 .tl>div{border-top:4px solid var(--line);padding-top:8px;font-size:14px}.tl>div.past{border-color:var(--good)}.tl>div.now{border-color:var(--accent)}
-.tl .d{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:16px}
+.tl .d{font-weight:700;font-size:16px}
 .legend-list{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 12px;align-items:center;font-size:14px}
 @media (max-width:760px){.flow{grid-template-columns:minmax(0,1fr);gap:22px}.flow>div:not(:last-child)::after{content:"\2193";right:auto;left:50%;top:auto;bottom:-22px;transform:translateX(-50%)}}
 .caprow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:10px 0 4px}.caprow input{width:76px}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}.kv dt{color:var(--text-2)}.kv dd{margin:0;word-break:break-all}
 .grid>.card{margin:0}.grid{margin-bottom:16px}
 @media (max-width:640px){.tile .val{font-size:24px}.hide-sm{display:none}header{position:static}.hrow{gap:8px}.hrow h1{flex-basis:100%}.big{padding:8px 14px}.tile{padding:12px}.g4{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}
+
+/* ── Web app look (frontend src/index.css + feel.css): sidebar, large titles, ink buttons,
+   cards that sit on the page with a hairline and a soft shadow, one focus ring everywhere ── */
+h1{font-size:24px;font-weight:700;margin:0;flex:1;min-width:150px}
+h2{font-size:17px;font-weight:650}
+.side{position:fixed;inset:0 auto 0 0;width:232px;display:flex;flex-direction:column;background:var(--side);border-right:1px solid var(--line);z-index:20;padding:14px 12px}
+.logo{display:flex;align-items:center;gap:10px;padding:4px 6px 14px}
+.logo b{display:block;font-size:17px;font-weight:700;letter-spacing:-.02em;line-height:1.15}.logo .v{color:var(--accent-text)}
+.logo small{display:block;font:600 10px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.mark.dk{display:none}
+:root[data-theme="dark"] .mark.lt{display:none}:root[data-theme="dark"] .mark.dk{display:block}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .mark.lt{display:none}:root:not([data-theme="light"]) .mark.dk{display:block}}
+.side nav{display:flex;flex-direction:column;gap:2px;overflow-y:auto;flex:1}
+.ng{font:600 10px/1 var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:14px 10px 6px}
+.side [role=tab]{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1px solid transparent;background:none;border-radius:10px;padding:7px 10px;cursor:pointer;color:var(--text-2)}
+.side [role=tab]:hover{background:var(--surface-2);color:var(--text)}
+.side [role=tab][aria-selected=true]{background:var(--lav);border-color:color-mix(in oklab,var(--accent) 25%,transparent);color:var(--text)}
+.side [role=tab][aria-selected=true] .ni{color:var(--accent-text)}
+.ni{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nt{display:grid;min-width:0}.nt b{font-size:14px;font-weight:600;line-height:1.3}.nt small{font-size:11.5px;color:var(--muted);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sfoot{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.seg{display:flex;background:var(--surface-2);border-radius:var(--rc);padding:3px;gap:2px}
+.seg button{flex:1;border:0;background:none;border-radius:6px;padding:4px 0;font-size:12px;cursor:pointer;color:var(--text-2)}
+.seg button[aria-pressed=true]{background:var(--surface);color:var(--text);font-weight:600;box-shadow:0 1px 2px rgba(17,24,39,.12)}
+.shell{margin-left:232px;min-width:0}
+header.top{position:sticky;top:0;z-index:10;background:color-mix(in oklab,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.hrow{display:flex;gap:12px;align-items:center;flex-wrap:wrap;max-width:1120px;margin:0 auto;padding:14px 24px}
+.hact{display:flex;gap:8px;margin-left:auto}
+.sbar{max-width:1120px;padding:0 24px 12px}
+.wrap{max-width:1120px;padding:24px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:var(--rc);padding:8px 14px;font-weight:500;transition:background-color .18s,border-color .18s,box-shadow .18s,scale .18s}
+.btn:hover{border-color:var(--line-2);background:var(--surface-2)}
+.btn:not(:disabled):active{scale:.965}
+.btn.primary{background:var(--primary);color:var(--on-primary);border-color:transparent;font-weight:600;box-shadow:0 1px 0 rgba(255,255,255,.14) inset,0 1px 2px rgba(17,24,39,.25),0 6px 16px -6px rgba(46,16,101,.45)}
+.btn.primary:hover{background:var(--primary-hover);filter:none}
+.btn.quiet{border-color:transparent;background:none;color:var(--text-2)}.btn.quiet:hover{background:var(--surface-2);color:var(--text)}
+.btn.danger{color:var(--bad-text)}.btn.danger:hover{background:color-mix(in oklab,var(--bad) 8%,transparent);border-color:color-mix(in oklab,var(--bad) 35%,transparent)}
+:is(button,a,input,select,textarea,summary,[role=tab]):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.card{border:1px solid color-mix(in oklab,var(--line) 80%,transparent);box-shadow:var(--shadow);border-radius:var(--r);padding:20px}
+.card .card{box-shadow:none}
+.banner{border-radius:var(--r);box-shadow:var(--shadow)}
+.banner.warn{background:color-mix(in oklab,var(--warn) 7%,var(--surface))}.banner.bad{background:color-mix(in oklab,var(--bad) 6%,var(--surface))}.banner.good{background:color-mix(in oklab,var(--good) 6%,var(--surface))}
+.tile .lab,th,.kv dt{font:600 10.5px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.tile .val{font-size:32px;font-weight:700}
+.pill{background:color-mix(in oklab,currentColor 10%,transparent);font-weight:600}
+.pill.info{color:var(--accent-text)}
+label.f input,label.f select,label.f textarea,.step textarea,.step input,.caprow input{border-radius:var(--rc);border:1px solid var(--line-2);background:var(--surface)}
+label.f input:focus,label.f select:focus,label.f textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);outline:none}
+details.howto{box-shadow:var(--shadow)}
+details.howto>summary{color:var(--text)}
+details.howto>summary::before{background:var(--lav);color:var(--accent-text)}
+.qh:hover,.qh[aria-expanded=true]{background:var(--lav)}
+.pop{border-color:color-mix(in oklab,var(--accent) 40%,var(--line))}
+.sbar>div{background:var(--surface);box-shadow:var(--shadow)}
+.stp.cur .dot{background:var(--lav)}
+code{font-family:var(--mono)}
+#login{background:radial-gradient(ellipse at top,var(--accent-soft),transparent 60%),var(--bg)}
+#login .card{padding:28px}
+#login .btn.primary{padding:10px 18px}
+.mtop{display:none}
+.card.empty{text-align:center;padding:36px 24px}.card.empty p{max-width:520px;margin:6px auto 16px}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.stats>div{background:var(--surface-2);padding:8px 10px;display:grid;gap:2px}
+.stats span{font:600 10px/1.3 var(--mono);text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.stats b{font-size:16px;font-variant-numeric:tabular-nums}
+body:not([data-tab=overview]) #banners:not([data-lvl=bad]){display:none}
+@media (max-width:900px){
+  .side{position:static;width:auto;height:auto;flex-direction:column;padding:10px 12px 0;border-right:0;border-bottom:1px solid var(--line)}
+  .side .logo{padding:2px 4px 8px}
+  .side nav{flex-direction:row;overflow-x:auto;gap:4px;padding-bottom:10px;scrollbar-width:none}.side nav::-webkit-scrollbar{display:none}
+  .ng,.nt small{display:none}
+  .side [role=tab]{width:auto;flex:none;padding:7px 12px;gap:8px;border-radius:999px}
+  .sfoot{position:absolute;top:12px;right:12px;border:0;padding:0;display:flex;gap:6px}
+  .sfoot .seg{display:none}
+  .shell{margin-left:0}
+  header.top{position:static}
+  .hrow,.wrap{padding:14px 16px}.sbar{padding:0 16px 12px}
+  h1{font-size:20px}
+}
+@media (max-width:640px){.hact{width:100%}.hact .btn{flex:1}}
 </style>
 </head>
 <body>
 
 <div id="login" class="hidden">
   <form class="card" id="loginForm">
-    <h2><span class="brand">P</span>PitchPersona Mailer</h2>
-    <p class="muted small">Sign in with the PANEL_PASSWORD you set in Railway.</p>
+    <div class="logo" style="margin-bottom:14px"><img class="mark lt" src="/assets/mark-64.png" width="30" height="30" alt=""><img class="mark dk" src="/assets/mark-dark-64.png" width="30" height="30" alt=""><span><b>Pitch<span class="v">Persona</span></b><small>Mailer</small></span></div><h2>Sign in</h2>
+    <p class="muted small">Enter the panel password. It is the PANEL_PASSWORD variable on the mailer's Railway service.</p>
     <label class="f">Password<input type="password" id="pw" autocomplete="current-password" required></label>
     <p id="loginErr" class="small" style="color:var(--bad-text)"></p>
     <button class="btn primary big" style="width:100%">Sign in</button>
@@ -197,23 +293,33 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
 
 <div id="topload" aria-hidden="true"></div>
 <div id="app" class="hidden">
-<header>
-  <div class="hrow">
-    <h1><span class="brand">P</span>PitchPersona Mailer</h1>
-    <span class="row" style="gap:0;flex-wrap:nowrap"><span id="statusPill" class="pill">Loading</span><button type="button" class="qh" data-help="status" aria-label="What do the status and buttons mean?" aria-expanded="false">?</button></span>
-    <button class="btn big" id="toggleBtn">Start</button>
-    <button class="btn" id="runBtn" title="Runs one cycle now, outside working hours too. Every limit still applies.">Run a cycle now</button>
-    <button class="btn sm" id="logoutBtn">Sign out</button>
-  </div>
-  <nav role="tablist">
-    <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
-    <button role="tab" data-tab="inboxes" aria-selected="false">Inboxes</button>
-    <button role="tab" data-tab="campaigns" aria-selected="false">Campaigns</button>
-    <button role="tab" data-tab="replies" aria-selected="false">Replies <span id="replyBadge" class="pill bad hidden" style="padding:0 7px"></span></button>
-    <button role="tab" data-tab="activity" aria-selected="false">Activity</button>
-    <button role="tab" data-tab="settings" aria-selected="false">Settings</button>
-    <button role="tab" data-tab="help" aria-selected="false">Guide</button>
+<aside class="side" aria-label="Mailer">
+  <div class="logo"><img class="mark lt" src="/assets/mark-64.png" width="30" height="30" alt="" aria-hidden="true"><img class="mark dk" src="/assets/mark-dark-64.png" width="30" height="30" alt="" aria-hidden="true"><span><b>Pitch<span class="v">Persona</span></b><small>Mailer</small></span></div>
+  <nav role="tablist" aria-label="Pages">
+    <div class="ng">Warm-up</div>
+    <button role="tab" data-tab="overview" aria-selected="true"><svg class="ni" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg><span class="nt"><b>Overview <span id="ovBadge" class="pill warn hidden" style="padding:0 7px"></span></b><small>How it's going today</small></span></button>
+    <button role="tab" data-tab="inboxes" aria-selected="false"><svg class="ni" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><span class="nt"><b>Inboxes</b><small>Senders, limits, logins</small></span></button>
+    <div class="ng">Outreach</div>
+    <button role="tab" data-tab="campaigns" aria-selected="false"><svg class="ni" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg><span class="nt"><b>Campaigns</b><small>Cold email sequences</small></span></button>
+    <button role="tab" data-tab="replies" aria-selected="false"><svg class="ni" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v5"/></svg><span class="nt"><b>Replies <span id="replyBadge" class="pill bad hidden" style="padding:0 7px"></span></b><small>People who wrote back</small></span></button>
+    <div class="ng">System</div>
+    <button role="tab" data-tab="activity" aria-selected="false"><svg class="ni" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span class="nt"><b>Activity</b><small>Every email and event</small></span></button>
+    <button role="tab" data-tab="settings" aria-selected="false"><svg class="ni" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg><span class="nt"><b>Settings</b><small>Hours, AI, Google, safety</small></span></button>
+    <button role="tab" data-tab="help" aria-selected="false"><svg class="ni" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg><span class="nt"><b>Guide</b><small>How warm-up works</small></span></button>
   </nav>
+  <div class="sfoot">
+    <div class="seg" role="group" aria-label="Theme"><button type="button" data-theme-set="light">Light</button><button type="button" data-theme-set="auto">Auto</button><button type="button" data-theme-set="dark">Dark</button></div>
+    <button class="btn sm quiet" id="logoutBtn">Sign out</button>
+  </div>
+</aside>
+<div class="shell">
+<header class="top">
+  <div class="hrow">
+    <h1 id="pageTitle">Overview</h1>
+    <span class="row" style="gap:0;flex-wrap:nowrap"><span id="statusPill" class="pill">Loading</span><button type="button" class="qh" data-help="status" aria-label="What do the status and buttons mean?" aria-expanded="false">?</button></span>
+    <span class="hact"><button class="btn" id="runBtn" title="Runs one cycle now, outside working hours too. Every limit still applies.">Run a cycle now</button>
+    <button class="btn big" id="toggleBtn">Start</button></span>
+  </div>
   <div class="sbar" id="sbar" role="status" aria-live="polite"></div>
 </header>
 
@@ -503,6 +609,7 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
   </section>
 </main>
 </div>
+</div>
 
 <dialog id="inboxDlg">
   <form id="inboxForm" method="dialog">
@@ -600,8 +707,14 @@ $('#loginForm').onsubmit=async e=>{e.preventDefault();$('#loginErr').textContent
   try{await api('/api/login',{method:'POST',body:{password:$('#pw').value}});$('#pw').value='';await load(true);}catch(err){$('#loginErr').textContent=err.message;}};
 $('#logoutBtn').onclick=async()=>{await api('/api/logout',{method:'POST'}).catch(()=>{});showLogin();};
 
-$$('nav button').forEach(b=>b.onclick=()=>go(b.dataset.tab));
-function go(t){tab=t;$$('nav button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));$$('[data-panel]').forEach(p=>p.classList.toggle('hidden',p.dataset.panel!==t));
+$$('nav [role=tab]').forEach(b=>b.onclick=()=>go(b.dataset.tab));
+// Light, dark, or follow the device (the default), remembered in this browser.
+function setTheme(m){if(m==='light'||m==='dark')document.documentElement.dataset.theme=m;else delete document.documentElement.dataset.theme;
+  try{localStorage.setItem('ww-theme',m)}catch{}
+  $$('[data-theme-set]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.themeSet===m));}
+$$('[data-theme-set]').forEach(b=>b.onclick=()=>setTheme(b.dataset.themeSet));
+setTheme(document.documentElement.dataset.theme||'auto');
+function go(t){tab=t;document.body.dataset.tab=t;$$('nav [role=tab]').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));const nt=$(`nav [data-tab="${t}"] .nt b`);if(nt)$('#pageTitle').textContent=nt.firstChild.textContent.trim();$$('[data-panel]').forEach(p=>p.classList.toggle('hidden',p.dataset.panel!==t));
   if(t==='activity')loadMail(); if(t==='settings')fillSettings(); if(t==='campaigns')loadCampaigns(); if(t==='replies')loadReplies(); try{localStorage.setItem('ww-tab',t)}catch{} }
 document.addEventListener('click',e=>{const g=e.target.closest('[data-goto]');if(g)go(g.dataset.goto);});
 
@@ -719,7 +832,10 @@ function render(){
   const lh=linkHost();
   if(S.campaigns?.count&&lh&&!onSendingDomain(lh)) probs.push(['warn',`Links in campaign emails would point at <b>${esc(lh)}</b>, which isn't one of your sending domains. Before a campaign sends, set an address on a sending domain under Settings, Cold email safety.`]);
   const lvl=probs.some(p=>p[0]==='bad')?'bad':probs.length?'warn':'good';
-  $('#banners').innerHTML=probs.length?`<div class="banner ${lvl}"><b>${probs.length} thing${probs.length>1?'s':''} to fix</b><ul>${probs.map(p=>`<li>${p[1]}</li>`).join('')}</ul></div>`
+  // Problems that stop sending show on every page; to-dos that don't only on Overview, with a count in the sidebar.
+  $('#banners').dataset.lvl=lvl;
+  const ob=$('#ovBadge');ob.textContent=probs.length;ob.className='pill '+(lvl==='bad'?'bad':'warn')+(probs.length?'':' hidden');
+  $('#banners').innerHTML=probs.length?`<div class="banner ${lvl}"><b>${lvl==='bad'?`${probs.length} thing${probs.length>1?'s':''} to fix`:`${probs.length} thing${probs.length>1?'s':''} to set up`}</b><ul>${probs.map(p=>`<li>${p[1]}</li>`).join('')}</ul></div>`
     :`<div class="banner good"><b>All safety checks pass.</b> <span class="muted small">Last cycle ${fmtTime(sc.lastTickAt)} · next ${fmtTime(sc.nextTickAt)}</span></div>`;
   renderStatus();
 
@@ -846,7 +962,15 @@ function renderInboxCards(){
     ${loginBlock(i)}
     ${i.capNote?`<div class="small" style="color:var(--warn-text)">${esc(i.capNote)}</div>`:''}
     ${i.role==='sender'?`<div class="chart" data-ramp="${i.id}"></div><div class="legend" style="margin:0"><span><i style="background:var(--s1)"></i>Sent</span><span><i style="background:var(--ref);height:2px"></i>Planned</span></div>`:''}
-    <dl class="kv"><dt>Warm-up day</dt><dd>${i.role==='seed'?'–':i.day||'starts '+shortDay(i.start_date)}</dd><dt>Sent 7d</dt><dd>${i.sent7d}</dd><dt>Received 7d</dt><dd>${i.received7d}</dd><dt>Errors 7d</dt><dd>${i.errors7d}${i.errorsFixed7d?` <span class="muted small" title="These came before its last passing login test, so they were setup problems that are fixed now. They don't lower its health.">(+${i.errorsFixed7d} fixed during setup)</span>`:''}</dd><dt>Sign-in</dt><dd>${i.signin==='google'?(S.google?'Google sign-in':'<span style="color:var(--bad-text)">Google sign-in, key missing</span>'):i.hasPassword?'App password (encrypted)':'<span style="color:var(--bad-text)">No app password</span>'}</dd></dl>
+    <div class="stats">
+      <div><span>Day</span><b>${i.role==='seed'?'–':i.day||'starts '+shortDay(i.start_date)}</b></div>
+      ${i.role==='sender'?`<div><span>Today</span><b>${i.newToday} / ${i.targetToday}</b></div>`:''}
+      <div><span>Sent 7d</span><b>${i.sent7d}</b></div>
+      <div><span>Received 7d</span><b>${i.received7d}</b></div>
+      <div><span>Inbox rate</span><b>${i.placement7d==null?'–':i.placement7d+'%'}</b></div>
+      <div><span>Errors 7d</span><b${i.errors7d?' style="color:var(--bad-text)"':''}>${i.errors7d}</b></div>
+    </div>
+    <div class="muted small">Signs in with ${i.signin==='google'?(S.google?'Google sign-in':'<span style="color:var(--bad-text)">Google sign-in, but the key is missing</span>'):i.hasPassword?'an app password (encrypted)':'<span style="color:var(--bad-text)">no app password yet</span>'}${i.errorsFixed7d?` · <span title="These came before its last passing login test, so they were setup problems that are fixed now. They don't lower its health.">${i.errorsFixed7d} older errors fixed during setup</span>`:''}</div>
     ${i.role==='sender'?`<div class="caprow"><label class="small" for="cap${i.id}">Daily cap</label><input id="cap${i.id}" class="capIn" data-id="${i.id}" type="number" min="1" max="${S.limits.rampCap[1]}" step="1" value="${esc(String(capDraft[i.id]??i.cap??''))}" placeholder="none"><button class="btn sm" data-act="cap" data-id="${i.id}">Save</button><button type="button" class="qh" data-help="dailyCap" aria-label="What is the daily cap?" aria-expanded="false">?</button>
       <span class="muted small">Today's plan: ${i.targetToday}. ${i.cap?`Capped at ${i.cap} a day.`:`No cap: follows the ramp up to ${S.settings.rampCap} a day.`}</span></div>`:''}
     ${peekBlock(i)}
@@ -1350,7 +1474,7 @@ function renderCampList(){
   $('#campCards').innerHTML=L.campaigns.length?L.campaigns.map(c=>{const st=c.stats;return `<div class="card" style="margin:0;cursor:pointer" data-camp="${c.id}">
     <div class="row spread"><h3>${esc(c.name)}</h3>${campPill(c)}</div>
     <div class="kv" style="margin-top:10px"><dt>Leads</dt><dd>${st.total}${st.counts.review?` <span class="pill warn">${st.counts.review} to review</span>`:''}</dd><dt>Sent</dt><dd>${st.sent}</dd>
-    <dt>Replied</dt><dd>${st.replied}${st.replyRate!=null?` (${st.replyRate}%)`:''}</dd><dt>Bounced</dt><dd>${st.bounced}</dd></div></div>`;}).join(''):'<div class="card muted">No campaigns yet.</div>';
+    <dt>Replied</dt><dd>${st.replied}${st.replyRate!=null?` (${st.replyRate}%)`:''}</dd><dt>Bounced</dt><dd>${st.bounced}</dd></div></div>`;}).join(''):`<div class="card empty"><h2>No campaigns yet</h2><p class="muted">A campaign sends a short cold email sequence to your leads from the inboxes you've warmed up. You can build one now: it waits and starts sending once an inbox has finished warm-up.</p><button class="btn primary" onclick="document.getElementById('newCampBtn').click()">New campaign</button></div>`;
 }
 // [pill class, short label, longer explanation]: an active campaign only says "Sending" when it can.
 function campState(c){
