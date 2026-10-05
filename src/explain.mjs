@@ -19,16 +19,63 @@ export function errText(e) {
 const APP_PASSWORDS = "https://myaccount.google.com/apppasswords";
 const TWO_STEP = "https://myaccount.google.com/signinoptions/twosv";
 
+const DELEGATION = "Security, Access and data control, API controls, Manage Domain Wide Delegation";
+const IMAP_ON = "In Google Admin (https://admin.google.com) open Apps, Google Workspace, Gmail, End User Access, and turn on POP and IMAP access.";
+
+// An inbox that signs in through a Google service account (see google.mjs). "smtp" is then its
+// sending side, the Gmail API. Returns null for anything the general rules below explain well.
+function explainGoogle(kind, r, inbox, account, out) {
+  const who = inbox.email, domain = who.split("@")[1];
+  const id = account?.clientId || "(the client ID shown under Settings, Google sign-in)";
+  if (/no service-account key is saved/i.test(r))
+    return out("google_no_key", "Google sign-in is chosen for this inbox, but no service-account key is saved.", "Open Settings, Google sign-in, and add the key file. The steps are listed there.");
+  if (/unauthorized_client|access_denied|not authorized for any of the scopes/i.test(r))
+    return out("google_delegation", `Google hasn't allowed the mailer to sign in as ${who} yet.`,
+      `Sign in to Google Admin (https://admin.google.com) as an admin of ${domain}. Open ${DELEGATION}, press Add new, enter Client ID ${id} and OAuth scope https://mail.google.com/ then press Authorize. Google can take a few minutes, sometimes longer, to apply it. The mailer tries again every 15 minutes by itself, or press Test login.`);
+  if (/Invalid email or User ID|invalid_grant: (Not a valid email|Invalid email)/i.test(r))
+    return out("google_user", `Google says ${who} isn't an account it can sign in as.`,
+      `Check that ${who} is spelled right and is a real user in your Google Workspace, not an alias or a group. A new user can take a few minutes to become usable.`);
+  if (/Invalid JWT Signature|invalid_client|disabled_client|account (not found|is disabled|has been deleted)/i.test(r))
+    return out("google_key", "Google didn't accept the service-account key. It may have been deleted, or the service account switched off.",
+      "In Google Cloud (https://console.cloud.google.com/iam-admin/serviceaccounts) open the service account, then Keys, Add key, Create new key, JSON. Add the new file under Settings, Google sign-in.");
+  if (/reasonable timeframe|Invalid JWT/i.test(r))
+    return out("google_clock", "Google rejected the sign-in because this server's clock looks wrong.", "Redeploy the mailer. If it keeps happening, tell the hosting provider the server's clock is off.");
+  if (/accessNotConfigured|SERVICE_DISABLED|has not been used in project|API has not been used/i.test(r))
+    return out("api_off", "The Gmail API is switched off in the Google Cloud project the key belongs to.",
+      `Open https://console.cloud.google.com/apis/library/gmail.googleapis.com${account?.projectId ? `?project=${account.projectId}` : ""} press Enable, wait a minute, then press Test login.`);
+  if (/failedPrecondition|Precondition check failed|Mail service not enabled/i.test(r))
+    return out("gmail_off", `Google won't open ${who}'s mailbox for the mailer.`,
+      `Check in Google Admin, Users, that ${who} has a Google Workspace licence with Gmail switched on. Personal Gmail addresses can't use Google sign-in: give them an app password instead.`);
+  if (/Delegation denied/i.test(r))
+    return out("google_delegation", `Google refused to let the mailer act for ${who}.`, `In Google Admin for ${domain}, open ${DELEGATION} and check Client ID ${id} has the scope https://mail.google.com/ then press Test login.`);
+  if (/\b429\b|LimitExceeded|limit exceeded|quotaExceeded|RESOURCE_EXHAUSTED/i.test(r))
+    return out("throttled", `Google is limiting how much ${who} can send or read for a while.`,
+      "Wait until tomorrow, then press Resume on the inbox if it paused. Keep its daily cap where it is or lower it.");
+  const viaApi = kind === "smtp" || /googleapis\.com/i.test(r);
+  if (viaApi && (NET_RE.test(r) || /ENOTFOUND|EAI_AGAIN|getaddrinfo|didn't answer within/i.test(r)))
+    return out("api_blocked", "The mailer couldn't reach Google's servers.",
+      "This is usually brief. The connection is checked again every 5 minutes, or press Test login to try now. If it lasts, check that this server can make outgoing HTTPS connections.");
+  if (kind === "imap" && /not enabled for IMAP|IMAP (access )?(is )?disabled|enable your account for IMAP/i.test(r))
+    return out("imap_off", `IMAP is turned off for ${who}, so the mailer can't read its inbox.`, `${IMAP_ON} Wait about 15 minutes, then press Test login again.`);
+  if (kind === "imap" && /AUTHENTICATIONFAILED|Invalid credentials|authentication failed/i.test(r))
+    return out("google_imap", `Google signed the mailer in, but refused it for reading ${who}'s mail.`,
+      `${IMAP_ON} Also check in ${DELEGATION} that Client ID ${id} has exactly the scope https://mail.google.com/ . Then press Test login.`);
+  return null;
+}
+
 // kind: "smtp" (sending) or "imap" (reading). Returns null for "ok" or no result.
-// code is one of: smtp_blocked, imap_blocked, host, no_greeting, bad_password, app_password_required,
-// web_login, imap_off, throttled, slow, dropped, tls, other.
-export function explainMailError(kind, raw, inbox, { onRailway = false } = {}) {
+// code is one of: smtp_blocked, imap_blocked, api_blocked, host, no_greeting, bad_password, app_password_required,
+// web_login, imap_off, throttled, slow, dropped, tls, other, and for Google sign-in google_no_key,
+// google_delegation, google_user, google_key, google_clock, api_off, gmail_off, google_imap.
+// google: { clientId, projectId } of the saved service account, for the fix texts.
+export function explainMailError(kind, raw, inbox, { onRailway = false, google: account = null } = {}) {
   if (!raw || raw === "ok") return null;
   const r = String(raw);
   const host = kind === "smtp" ? inbox.smtp_host : inbox.imap_host, port = kind === "smtp" ? inbox.smtp_port : inbox.imap_port;
   const google = inbox.provider === "google" || /gmail|google/i.test(host || "");
   const who = inbox.email;
   const out = (code, why, fix) => ({ code, why, fix, raw: r });
+  if (inbox.signin === "google") { const g = explainGoogle(kind, r, inbox, account, out); if (g) return g; }
 
   if (/didn't finish within|Socket timeout|ETIMEOUT\b|^Timeout\b/i.test(r))
     return out("slow", "The mail server stopped answering partway through.", "This is usually temporary. Press Test login again in a few minutes.");
@@ -38,7 +85,8 @@ export function explainMailError(kind, raw, inbox, { onRailway = false } = {}) {
   if (NET_RE.test(r) || (GREETING_RE.test(r) && kind === "smtp" && onRailway)) {
     if (kind === "smtp" && onRailway)
       return out("smtp_blocked", `Railway is blocking outgoing email. The mailer can't open a connection to ${host} on port ${port}, because Railway's Free, Trial and Hobby plans block every email-sending (SMTP) connection.`,
-        "Upgrade this Railway workspace to the Pro plan, then redeploy the mailer in Railway (Railway only opens the email ports on a new deploy). The mailer checks the connection when it starts and tests the logins again by itself. Nothing in Google needs changing.");
+        google ? "Switch this inbox to Google sign-in: it sends through Google's API, which Railway doesn't block, and needs no app password. Settings, Google sign-in has the steps. The other way is to upgrade this Railway workspace to the Pro plan, then redeploy the mailer in Railway."
+          : "Upgrade this Railway workspace to the Pro plan, then redeploy the mailer in Railway (Railway only opens the email ports on a new deploy). The mailer checks the connection when it starts and tests the logins again by itself.");
     return out(kind === "smtp" ? "smtp_blocked" : "imap_blocked", `The mailer can't open a connection to ${host} on port ${port}. Something between this server and the mail provider is blocking it.`,
       `Check the host and port under Edit, Server settings. If they're right, this server's network blocks outgoing connections on port ${port}.`);
   }
@@ -52,8 +100,7 @@ export function explainMailError(kind, raw, inbox, { onRailway = false } = {}) {
     return out("web_login", "Google stopped the sign-in until it's confirmed in a browser.",
       `Sign in to Gmail as ${who} in a browser, approve any security prompt, then press Test login again.`);
   if (/not enabled for IMAP|IMAP (access )?(is )?disabled|enable your account for IMAP/i.test(r))
-    return out("imap_off", `IMAP is turned off for ${who}, so the mailer can't read its inbox.`,
-      "In Google Admin (https://admin.google.com) open Apps, Google Workspace, Gmail, End User Access, and turn on POP and IMAP access. Wait about 15 minutes, then press Test login again.");
+    return out("imap_off", `IMAP is turned off for ${who}, so the mailer can't read its inbox.`, `${IMAP_ON} Wait about 15 minutes, then press Test login again.`);
   if (/too many|THROTTLED|4\.7\.0|try again later|temporar/i.test(r))
     return out("throttled", "The provider is limiting sign-ins for this inbox for a while.", "Wait 15 to 30 minutes, then press Test login again. Don't retry in a loop: it makes the wait longer.");
   if (/\b535\b|5\.7\.8|BadCredentials|AUTHENTICATIONFAILED|Invalid credentials|LOGIN failed|Username and Password not accepted|EAUTH|Invalid login|authentication failed|password was rejected/i.test(r))

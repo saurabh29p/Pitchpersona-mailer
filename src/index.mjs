@@ -26,6 +26,7 @@ import { ImapFlow } from "imapflow";
 import { createCampaigns } from "./campaigns.mjs";
 import { dkimVerdict } from "./dkim.mjs";
 import { errText, explainMailError, friendlyError, NET_RE } from "./explain.mjs";
+import { createGoogle, parseServiceAccount, GMAIL_API, PERSONAL_GMAIL } from "./google.mjs";
 
 const DRY = process.env.DRY_RUN === "1";
 const ONCE = process.argv.includes("--once");
@@ -69,7 +70,8 @@ CREATE INDEX IF NOT EXISTS seen_time ON seen(seen_at);
 `);
 // The last Test login result: 1 passed, 0 failed, NULL not tested since the password was saved.
 // login_smtp and login_imap keep what each server said ("ok" or its error), so the panel can explain it.
-for (const col of ["login_ok INTEGER", "login_at TEXT", "login_smtp TEXT", "login_imap TEXT"]) { try { db.exec(`ALTER TABLE inboxes ADD COLUMN ${col}`); } catch { /* already there */ } }
+// signin: "password" (an app password over SMTP and IMAP) or "google" (the saved Google service account).
+for (const col of ["login_ok INTEGER", "login_at TEXT", "login_smtp TEXT", "login_imap TEXT", "signin TEXT DEFAULT 'password'"]) { try { db.exec(`ALTER TABLE inboxes ADD COLUMN ${col}`); } catch { /* already there */ } }
 
 // ── Settings ────────────────────────────────────────────────────────────────────
 // Every number has a hard range. Values outside it are clamped on save, so a typo can't
@@ -103,6 +105,7 @@ const SETTINGS = {
   aiEnabled:         { def: true },
   aiModel:           { def: "anthropic/claude-haiku-4.5" },
   openrouterKeyEnc:  { def: "" },
+  googleKeyEnc:      { def: "" },   // the Google service-account key file, encrypted
   topics: { def: [
     "moving the weekly sync to Thursday", "notes from yesterday's customer call", "the Q4 planning doc",
     "a vendor quote that came in high", "hiring a contractor for design work", "feedback on the onboarding checklist",
@@ -146,7 +149,8 @@ function saveSettings(patch) {
   const changed = {};
   for (const [k, v] of Object.entries(patch)) {
     if (k === "openrouterKey") { changed.openrouterKeyEnc = v ? encrypt(String(v).trim()) : ""; continue; }
-    if (k === "openrouterKeyEnc") continue;
+    if (k === "openrouterKeyEnc" || k === "googleKeyEnc") continue;
+    if (k === "googleKey") { changed.googleKeyEnc = v ? encrypt(JSON.stringify(parseServiceAccount(v))) : ""; continue; }
     changed[k] = cleanSetting(k, v);
   }
   const s = { ...getSettings(), ...changed };
@@ -154,6 +158,12 @@ function saveSettings(patch) {
   if (s.replyDelayMax <= s.replyDelayMin) throw new Error("Max reply delay must be above the min");
   const stmt = db.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
   for (const [k, v] of Object.entries(changed)) stmt.run(k, JSON.stringify(v));
+  if ("googleKeyEnc" in changed) {
+    // Logins through the old key say nothing about the new one.
+    google.forget();
+    db.prepare("UPDATE inboxes SET login_ok = NULL, login_at = NULL, login_smtp = NULL, login_imap = NULL WHERE signin = 'google'").run();
+    event("info", null, changed.googleKeyEnc ? `Google service-account key saved (client ID ${googleAccount().client_id})` : "Google service-account key removed");
+  }
   return s;
 }
 
@@ -172,6 +182,21 @@ function decrypt(blob) {
   d.setAuthTag(b.subarray(12, 28));
   return Buffer.concat([d.update(b.subarray(28)), d.final()]).toString("utf8");
 }
+
+// ── Google sign-in: one service account signs in as every Workspace inbox (google.mjs) ──
+let saCache = { enc: null, sa: null };
+function googleAccount() {
+  const enc = getSettings().googleKeyEnc;
+  if (enc !== saCache.enc) { let sa = null; try { sa = enc ? JSON.parse(decrypt(enc)) : null; } catch { /* unreadable: treated as missing */ } saCache = { enc, sa }; }
+  return saCache.sa;
+}
+const googleInfo = () => { const sa = googleAccount(); return sa ? { clientId: sa.client_id, clientEmail: sa.client_email, projectId: sa.project_id } : null; };
+const google = createGoogle({ account: googleAccount });
+const usesGoogle = (i) => i.signin === "google";
+const canSignIn = (i) => (usesGoogle(i) ? !!googleAccount() : !!i.password_enc);
+// What explainMailError needs to word its fixes for this server.
+const xopts = () => ({ onRailway: ON_RAILWAY, google: googleInfo() });
+const NO_GOOGLE_KEY = "Google sign-in is chosen, but no service-account key is saved. Add it under Settings, Google sign-in.";
 
 // ── Inboxes ─────────────────────────────────────────────────────────────────────
 const PROVIDERS = {
@@ -207,27 +232,35 @@ function saveInbox(input, id) {
     cap: capRaw === null || capRaw === "" || capRaw === undefined ? null : Math.min(SETTINGS.rampCap.max, Math.max(1, Number(capRaw) || 1)),
     paused: input.paused === undefined ? cur?.paused ?? 0 : input.paused ? 1 : 0,
   };
+  // Google sign-in is the default for a new Google inbox added without a password once a key is saved.
+  const wantGoogle = input.signin !== undefined ? input.signin === "google"
+    : cur ? cur.signin === "google" && provider === "google" : provider === "google" && !input.password && !!googleAccount() && !PERSONAL_GMAIL.test(email);
+  if (wantGoogle && provider !== "google") throw new Error("Google sign-in works only for Google Workspace inboxes. Pick Google Workspace as the provider, or sign in with an app password.");
+  if (wantGoogle && PERSONAL_GMAIL.test(email)) throw new Error(`${email} is a personal Gmail address, and Google only lets a service account sign in to Workspace accounts. Use an app password for it.`);
+  row.signin = wantGoogle ? "google" : "password";
   if (!row.smtp_host || !row.imap_host) throw new Error("SMTP and IMAP hosts are required for a custom provider");
   if (![row.smtp_port, row.imap_port].every((n) => Number.isInteger(n) && n > 0 && n < 65536)) throw new Error("Ports must be whole numbers, like 465 or 993");
   const password_enc = input.password ? encrypt(String(input.password).replace(/\s+/g, "")) : cur?.password_enc || "";
-  if (cur && input.password) db.prepare("UPDATE inboxes SET login_ok = NULL, login_at = NULL, login_smtp = NULL, login_imap = NULL WHERE id = ?").run(cur.id);
-  if (cur && input.password && String(cur.pause_reason || "").startsWith(AUTH_PAUSE))
-    db.prepare("UPDATE inboxes SET pause_reason = ? WHERE id = ?").run("New app password saved. Press Resume to start again.", cur.id);
+  const newWay = cur && (input.password || cur.signin !== row.signin);   // a new password, or a switch between password and Google
+  if (newWay) db.prepare("UPDATE inboxes SET login_ok = NULL, login_at = NULL, login_smtp = NULL, login_imap = NULL WHERE id = ?").run(cur.id);
+  if (newWay && String(cur.pause_reason || "").startsWith(AUTH_PAUSE))
+    db.prepare("UPDATE inboxes SET pause_reason = ? WHERE id = ?").run(`${input.password ? "New app password saved" : "Switched to Google sign-in"}. Press Resume to start again.`, cur.id);
   if (cur) {
     db.prepare(`UPDATE inboxes SET email=?, name=?, role=?, provider=?, smtp_host=?, smtp_port=?, imap_host=?, imap_port=?,
-      dkim_selector=?, start_date=?, cap=?, paused=?, password_enc=?, pause_reason=CASE WHEN ? = 0 THEN NULL ELSE pause_reason END,
+      dkim_selector=?, start_date=?, cap=?, paused=?, password_enc=?, signin=?, pause_reason=CASE WHEN ? = 0 THEN NULL ELSE pause_reason END,
       error_streak=CASE WHEN ? = 0 THEN 0 ELSE error_streak END WHERE id=?`)
       .run(row.email, row.name, row.role, row.provider, row.smtp_host, row.smtp_port, row.imap_host, row.imap_port,
-        row.dkim_selector, row.start_date, row.cap, row.paused, password_enc, row.paused, row.paused, id);
+        row.dkim_selector, row.start_date, row.cap, row.paused, password_enc, row.signin, row.paused, row.paused, id);
   } else {
     if (db.prepare("SELECT 1 FROM inboxes WHERE email = ?").get(email)) throw new Error("That inbox is already added");
     id = Number(db.prepare(`INSERT INTO inboxes (email, name, role, provider, smtp_host, smtp_port, imap_host, imap_port, dkim_selector,
-      start_date, cap, paused, password_enc, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      start_date, cap, paused, password_enc, signin, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(row.email, row.name, row.role, row.provider, row.smtp_host, row.smtp_port, row.imap_host, row.imap_port, row.dkim_selector,
-        row.start_date, row.cap, row.paused, password_enc, new Date().toISOString()).lastInsertRowid);
+        row.start_date, row.cap, row.paused, password_enc, row.signin, new Date().toISOString()).lastInsertRowid);
     if (row.role === "sender") checkDomain(domainOf(email), true).catch(() => {});
   }
   transports.delete(email); if (cur) transports.delete(cur.email);
+  google.forget(email);
   if (cur && ["smtp_host", "smtp_port", "imap_host", "imap_port"].some((k) => String(cur[k]) !== String(row[k])))
     db.prepare("UPDATE inboxes SET login_ok = NULL, login_at = NULL, login_smtp = NULL, login_imap = NULL WHERE id = ?").run(id);
   event("info", email, cur ? "Inbox settings updated" : `Inbox added (${row.role})`);
@@ -416,7 +449,11 @@ Reply with only JSON: {"subject": "...", "body": "..."}`;
 const NET_CHECK = !DRY && process.env.NET_CHECK !== "off";
 const reach = new Map();   // "host:port" -> { host, port, kind, ok, error, ms, at }
 const reachKey = (host, port) => `${host}:${port}`;
-const smtpReach = (i) => reach.get(reachKey(i.smtp_host, i.smtp_port));
+const API_URL = new URL(GMAIL_API);
+const API_TARGET = { host: API_URL.hostname, port: Number(API_URL.port) || (API_URL.protocol === "http:" ? 80 : 443), kind: "api" };
+// Where an inbox's sending goes: its SMTP server, or Google's API for Google sign-in.
+const sendTarget = (i) => (usesGoogle(i) ? API_TARGET : { host: i.smtp_host, port: i.smtp_port, kind: "smtp" });
+const sendReach = (i) => { const t = sendTarget(i); return reach.get(reachKey(t.host, t.port)); };
 function probe(host, port, ms = 8000) {
   return new Promise((resolve) => {
     const t0 = Date.now(), sock = netSocket.connect({ host, port });
@@ -429,12 +466,15 @@ function probe(host, port, ms = 8000) {
 function reachTargets(inboxes) {
   const t = new Map();
   for (const i of inboxes) {
-    if (i.smtp_host) t.set(reachKey(i.smtp_host, i.smtp_port), { host: i.smtp_host, port: i.smtp_port, kind: "smtp" });
+    const s = sendTarget(i);
+    if (s.host) t.set(reachKey(s.host, s.port), s);
     if (i.imap_host) t.set(reachKey(i.imap_host, i.imap_port), { host: i.imap_host, port: i.imap_port, kind: "imap" });
   }
   return [...t.values()];
 }
-const blockedHere = (r) => r.kind === "smtp" && ON_RAILWAY ? "Railway blocks outgoing email on its Free, Trial and Hobby plans." : `${r.kind === "smtp" ? "Sending" : "Reading"} through it waits until it connects.`;
+// Results for the servers some inbox still uses: an inbox switched to Google sign-in no longer needs its SMTP server.
+const reachNow = () => { const keys = new Set(reachTargets(listInboxes()).map((t) => reachKey(t.host, t.port))); return [...reach.values()].filter((r) => keys.has(reachKey(r.host, r.port))); };
+const blockedHere = (r) => r.kind === "smtp" && ON_RAILWAY ? "Railway blocks outgoing email on its Free, Trial and Hobby plans." : `${r.kind === "imap" ? "Reading" : "Sending"} through it waits until it connects.`;
 async function checkReach({ force = false, inboxes = listInboxes(), retest = true } = {}) {
   if (!NET_CHECK) return;
   const due = reachTargets(inboxes).filter((t) => {
@@ -458,17 +498,30 @@ async function checkReach({ force = false, inboxes = listInboxes(), retest = tru
 const retesting = new Set();
 function retestAfterRecovery(keys) {
   const list = listInboxes().filter((i) => {
-    if (i.login_ok !== 0 || !i.password_enc || retesting.has(i.id)) return false;
-    const failed = [["smtp", i.login_smtp, reachKey(i.smtp_host, i.smtp_port)], ["imap", i.login_imap, reachKey(i.imap_host, i.imap_port)]]
+    if (i.login_ok !== 0 || !canSignIn(i) || retesting.has(i.id)) return false;
+    const st = sendTarget(i);
+    const failed = [["smtp", i.login_smtp, reachKey(st.host, st.port)], ["imap", i.login_imap, reachKey(i.imap_host, i.imap_port)]]
       .filter(([, raw]) => raw && raw !== "ok");
     // Every side that failed did so on the connection, and that connection works now.
     return failed.length > 0 && failed.some(([, , k]) => keys.includes(k))
-      && failed.every(([kind, raw, k]) => /_blocked$/.test(explainMailError(kind, raw, i, { onRailway: ON_RAILWAY })?.code || "") && reach.get(k)?.ok);
+      && failed.every(([kind, raw, k]) => /_blocked$/.test(explainMailError(kind, raw, i, xopts())?.code || "") && reach.get(k)?.ok);
   });
   if (!list.length) return;
   event("info", null, `Testing ${list.length} login${list.length > 1 ? "s" : ""} again now that the mail server connects`);
   list.forEach((i) => retesting.add(i.id));
   (async () => { for (const i of list) { await testInbox(getInbox(i.id) || i).catch(() => {}); retesting.delete(i.id); } })();
+}
+// A failed Google sign-in is usually the admin's delegation step, which Google can take a while
+// to apply. Unlike a wrong password, retrying it can't lock an account, so it's tried again
+// every 15 minutes and the inbox starts working by itself once Google allows it.
+const GOOGLE_RETEST_MS = (Number(process.env.GOOGLE_RETEST_MINUTES ?? 15)) * 60000;
+function retestGoogle() {
+  if (DRY || !googleAccount()) return;
+  const list = listInboxes().filter((i) => usesGoogle(i) && i.login_ok === 0 && !retesting.has(i.id)
+    && (!i.login_at || Date.now() - Date.parse(i.login_at) >= GOOGLE_RETEST_MS));
+  if (!list.length) return;
+  list.forEach((i) => retesting.add(i.id));
+  (async () => { for (const i of list) { await testInbox(getInbox(i.id) || i, { auto: true }).catch(() => {}); retesting.delete(i.id); } })();
 }
 
 // ── Sending ─────────────────────────────────────────────────────────────────────
@@ -483,13 +536,18 @@ function transport(inbox) {
   return transports.get(inbox.email);
 }
 
+// Builds the whole message as SMTP would send it, for the Gmail API.
+const composer = nodemailer.createTransport({ streamTransport: true, buffer: true });
+
 // Provider push-back that means "stop now", not "try again later".
-const HARD_STOP = /spam|blocked|blacklist|reputation|suspicious|rate limit|too many|daily (user )?sending quota|5\.7\.\d|550|554|421 4\.7/i;
+const HARD_STOP = /spam|blocked|blacklist|reputation|suspicious|rate limit|limit exceeded|LimitExceeded|too many|daily (user )?sending quota|5\.7\.\d|550|554|421 4\.7/i;
 // "No such mailbox" at RCPT time: the address is bad, the inbox is fine.
 const RECIPIENT_BAD = /5\.1\.\d+|user unknown|unknown user|no such (user|mailbox)|does not exist|recipient address rejected|address not found|invalid recipient/i;
 
-// Every SMTP send, warm-up or campaign, goes through here so the push-back guard applies to both.
-async function smtpSend(from, mail, { test = false } = {}) {
+// Every send, warm-up or campaign, over SMTP or the Gmail API, goes through here so the push-back
+// guard applies to all of them. Returns { messageId }: the Message-ID the email really went out
+// with, which Gmail may have set itself. Replies and reply matching use that one.
+async function deliver(from, mail, { test = false } = {}) {
   // Re-read at the moment of sending: a pause pressed mid-cycle, or an inbox that paused
   // itself a second ago, must stop everything still queued in this cycle.
   const live = db.prepare("SELECT paused FROM inboxes WHERE id = ?").get(from.id);
@@ -497,20 +555,35 @@ async function smtpSend(from, mail, { test = false } = {}) {
   if (live.paused) throw Object.assign(new Error("Inbox is paused"), { code: "PAUSED" });
   if (!test && getSettings().paused) throw Object.assign(new Error("Warm-up is paused"), { code: "PAUSED" });
   if (stopping) throw Object.assign(new Error("The mailer is restarting"), { code: "PAUSED" });
-  if (DRY) return;
+  if (DRY) return { messageId: mail.messageId };
+  const headerFrom = `"${from.name}" <${from.email}>`;
   try {
-    await transport(from).sendMail({ from: `"${from.name}" <${from.email}>`, ...mail });
+    let messageId = mail.messageId;
+    if (usesGoogle(from)) {
+      const { message } = await composer.sendMail({ from: headerFrom, ...mail });
+      messageId = (await google.send(from.email, message, { inReplyTo: mail.inReplyTo })).messageId || messageId;
+    } else await transport(from).sendMail({ from: headerFrom, ...mail });
     db.prepare("UPDATE inboxes SET error_streak = 0 WHERE id = ?").run(from.id);
+    return { messageId };
   } catch (e) {
     const msg = String(e?.response || e?.message || e);
     if ((e?.code === "EENVELOPE" || /RCPT/i.test(e?.command || "")) && RECIPIENT_BAD.test(msg) && !/5\.7\.\d/.test(msg))
       throw Object.assign(e, { recipientRejected: true });
+    if (e?.google && e.status === 400 && /Invalid (To|Cc|Bcc) header|Recipient address/i.test(msg)) throw Object.assign(e, { recipientRejected: true });
     // The server couldn't be reached at all. That says nothing about this inbox, so it doesn't
     // count toward pausing it; the inbox waits until the connection check passes again.
-    if (NET_RE.test(errText(e))) {
-      const k = reachKey(from.smtp_host, from.smtp_port), prev = reach.get(k);
-      reach.set(k, { host: from.smtp_host, port: from.smtp_port, kind: "smtp", ok: false, error: e.code || "ETIMEDOUT", ms: null, at: Date.now() });
-      if (!prev || prev.ok) event("error", null, `Can't connect to ${from.smtp_host} on port ${from.smtp_port}. ${blockedHere({ kind: "smtp" })}`);
+    if (e?.network || NET_RE.test(errText(e))) {
+      const t = sendTarget(from), k = reachKey(t.host, t.port), prev = reach.get(k);
+      reach.set(k, { ...t, ok: false, error: e.code || "ETIMEDOUT", ms: null, at: Date.now() });
+      if (!prev || prev.ok) event("error", null, `Can't connect to ${t.host} on port ${t.port}. ${blockedHere(t)}`);
+      throw e;
+    }
+    // Google refused the sign-in, or the setup behind it (API switched off, delegation missing).
+    // That's the setup, not this inbox's sending: it's shown on the inbox, which waits until
+    // a login test passes. The test runs again by itself every 15 minutes.
+    const limited = e?.google && (e.status === 429 || /LimitExceeded|limit exceeded|quotaExceeded/i.test(msg));
+    if (e?.google && !limited && (e.signin || [401, 403, 400].includes(e.status))) {
+      db.prepare("UPDATE inboxes SET login_ok = 0, login_at = ?, login_smtp = ? WHERE id = ?").run(new Date().toISOString(), errText(e), from.id);
       throw e;
     }
     const streak = db.prepare("UPDATE inboxes SET error_streak = error_streak + 1 WHERE id = ? RETURNING error_streak").get(from.id).error_streak;
@@ -521,9 +594,9 @@ async function smtpSend(from, mail, { test = false } = {}) {
 }
 
 async function send(s, { from, to, subject, body, inReplyTo, threadRoot, depth, test = false }) {
-  const messageId = `<${crypto.randomUUID()}@${domainOf(from.email)}>`;
-  await smtpSend(from, {
-    to: `"${to.name}" <${to.email}>`, subject, text: body, messageId,
+  const { messageId } = await deliver(from, {
+    messageId: `<${crypto.randomUUID()}@${domainOf(from.email)}>`,
+    to: `"${to.name}" <${to.email}>`, subject, text: body,
     ...(inReplyTo ? { inReplyTo, references: [threadRoot, inReplyTo].filter((v, i, a) => v && a.indexOf(v) === i) } : {}),
   }, { test });
   db.prepare("INSERT INTO sent VALUES (?,?,?,?,?,?,?,?,?)").run(messageId, from.email, to.email, subject, body,
@@ -547,17 +620,18 @@ const sentToday = (email, day) => db.prepare("SELECT COUNT(*) c FROM sent WHERE 
 // Why an inbox can't send right now, or null when it can.
 async function blockedReason(s, inbox) {
   if (inbox.paused) return inbox.pause_reason ? `Paused: ${inbox.pause_reason}` : "Paused";
-  if (!inbox.password_enc && !DRY) return "No app password saved";
+  if (!DRY && !canSignIn(inbox)) return usesGoogle(inbox) ? NO_GOOGLE_KEY : "No app password saved";
   if (inbox.role === "sender" && s.requireDns && !DRY) {
     const d = await checkDomain(domainOf(inbox.email));
     if (!d.ok && d.error) return d.error;
     if (!d.ok) return `DNS not ready: missing ${["SPF", "DKIM", "DMARC"].filter((k) => !d[k.toLowerCase()]).join(", ")}`;
   }
   if (DRY) return null;
-  const r = smtpReach(inbox);
-  if (r && !r.ok) return `Can't connect to ${r.host} on port ${r.port}. ${ON_RAILWAY ? "Railway blocks outgoing email on its Free, Trial and Hobby plans; upgrade to Pro." : "Sending waits until it connects."}`;
+  const r = sendReach(inbox);
+  if (r && !r.ok) return `Can't connect to ${r.host} on port ${r.port}. ${r.kind === "smtp" && ON_RAILWAY
+    ? `Railway blocks outgoing email on its Free, Trial and Hobby plans; ${inbox.provider === "google" ? "switch this inbox to Google sign-in (Edit), or upgrade to Pro" : "upgrade to Pro"}.` : "Sending waits until it connects."}`;
   if (inbox.login_ok === 0) {
-    const x = explainMailError("smtp", inbox.login_smtp, inbox, { onRailway: ON_RAILWAY }) || explainMailError("imap", inbox.login_imap, inbox, { onRailway: ON_RAILWAY });
+    const x = explainMailError("smtp", inbox.login_smtp, inbox, xopts()) || explainMailError("imap", inbox.login_imap, inbox, xopts());
     return `Its last login test failed${x ? `: ${x.why.replace(/\.$/, "")}` : ""}. Fix it, then press Test login.`;
   }
   return null;
@@ -579,20 +653,21 @@ function startBlock(all = listInboxes()) {
   if (!all.length) return "Add your inboxes first. Warm-up sends emails between your own inboxes, so it needs at least two.";
   if (!senders.length) return "Add at least one sending inbox. Seeds only receive and reply.";
   if (all.length < 2) return "Add at least one more inbox. Warm-up sends between your own inboxes, so a single inbox has no one to write to.";
-  if (!DRY && !senders.some((i) => i.password_enc)) return "Save an app password for at least one sending inbox.";
+  if (!DRY && !senders.some(canSignIn)) return senders.some(usesGoogle) ? NO_GOOGLE_KEY : "Save an app password for at least one sending inbox, or set up Google sign-in under Settings.";
   if (DRY) return null;
   // Honest about the network and the logins too: switching on can't help while none of them works.
-  const usable = senders.filter((i) => i.password_enc);
-  const cut = usable.map(smtpReach).filter((r) => r && !r.ok);
+  const usable = senders.filter(canSignIn);
+  const cut = usable.map(sendReach).filter((r) => r && !r.ok);
   if (cut.length === usable.length) {
     const r = cut[0];
+    if (r.kind === "api") return `The mailer can't reach Google's servers (${r.host}), so no inbox can send. It checks again every 5 minutes; press Re-check connection to try now.`;
     return ON_RAILWAY
-      ? `Railway is blocking outgoing email, so no inbox can send. The mailer can't connect to ${r.host} on port ${r.port}: Railway allows sending email only on its Pro plan. Upgrade the Railway workspace to Pro, then redeploy the mailer in Railway.`
+      ? `Railway is blocking outgoing email, so no inbox can send. The mailer can't connect to ${r.host} on port ${r.port}: Railway allows sending email only on its Pro plan. Switch your Google inboxes to Google sign-in (Settings, Google sign-in), which sends through Google's API instead, or upgrade the Railway workspace to Pro and redeploy the mailer in Railway.`
       : `This server can't connect to ${r.host} on port ${r.port}, so no inbox can send. Check the server settings, or allow outgoing connections on port ${r.port}, then press Re-check connection.`;
   }
   if (usable.every((i) => i.login_ok === 0)) {
     const i = usable[0];
-    const x = explainMailError("smtp", i.login_smtp, i, { onRailway: ON_RAILWAY }) || explainMailError("imap", i.login_imap, i, { onRailway: ON_RAILWAY });
+    const x = explainMailError("smtp", i.login_smtp, i, xopts()) || explainMailError("imap", i.login_imap, i, xopts());
     return `None of your sending inboxes can sign in yet${x ? `. ${i.email}: ${x.why} ${x.fix}` : ". The Inboxes tab shows why for each one."}`;
   }
   return null;
@@ -616,7 +691,7 @@ async function sendPhase(s, pool, force) {
     try {
       const email = await writeEmail(s, { from, to, topic: pickOne(s.topics) });
       await send(s, { from, to, ...email, depth: 0 });
-    } catch (e) { if (e.code !== "PAUSED") event("error", from.email, `Send failed: ${friendlyError("smtp", e, from, { onRailway: ON_RAILWAY })}`); }
+    } catch (e) { if (e.code !== "PAUSED") event("error", from.email, `Send failed: ${friendlyError("smtp", e, from, xopts())}`); }
   });
 }
 
@@ -630,8 +705,9 @@ async function eachLimit(items, limit, fn) {
 // Every mailbox visit has a deadline. A mail server that stops answering mid-command would
 // otherwise hold up the cycle, and with it every other inbox, until the process restarts.
 async function withImap(inbox, fn, deadlineMs = IMAP_DEADLINE_MS) {
-  const client = new ImapFlow({ host: inbox.imap_host, port: inbox.imap_port || 993, secure: true,
-    auth: { user: inbox.email, pass: passwordOf(inbox) }, logger: false,
+  // Google sign-in reads with a token from the service account instead of a password (XOAUTH2).
+  const auth = usesGoogle(inbox) ? { user: inbox.email, accessToken: await google.token(inbox.email) } : { user: inbox.email, pass: passwordOf(inbox) };
+  const client = new ImapFlow({ host: inbox.imap_host, port: inbox.imap_port || 993, secure: true, auth, logger: false,
     connectionTimeout: 20000, greetingTimeout: 15000, socketTimeout: 120000 });
   // Without a listener, a socket error would be an uncaught 'error' event and kill the process.
   client.on("error", (e) => event("error", inbox.email, `Mail server connection error: ${String(e?.message || e).slice(0, 200)}`));
@@ -714,12 +790,19 @@ async function readPhase(s, pool) {
   // In parallel, so one slow or dead mailbox can't hold up the rest.
   // An inbox whose password was rejected isn't retried until a new one is saved: repeated
   // failed logins can get the account locked.
-  const readable = pool.filter((i) => i.password_enc && !(i.paused && String(i.pause_reason || "").startsWith(AUTH_PAUSE)));
+  // A Google inbox whose sign-in failed waits for its own retest (retestGoogle) instead of
+  // logging the same failure every cycle.
+  const readable = pool.filter((i) => canSignIn(i) && !(usesGoogle(i) && i.login_ok === 0) && !(i.paused && String(i.pause_reason || "").startsWith(AUTH_PAUSE)));
   await eachLimit(readable, 8, (inbox) =>
     readInbox(s, inbox, pool).then((ok) => { if (ok) scanned.add(inbox.id); }).catch((e) => {
+      if (usesGoogle(inbox) && (e?.google && !e.network || isAuthError(e))) {
+        google.forget(inbox.email);
+        db.prepare("UPDATE inboxes SET login_ok = 0, login_at = ?, login_imap = ? WHERE id = ?").run(new Date().toISOString(), errText(e), inbox.id);
+        event("error", inbox.email, `Reading the inbox failed: ${friendlyError("imap", e, inbox, xopts())}`);
+      }
       // A rejected login won't fix itself; stop retrying a bad password every few minutes.
-      if (isAuthError(e)) { pauseInbox(inbox, `${AUTH_PAUSE}. Save a new one, then resume.`); db.prepare("UPDATE inboxes SET login_ok = 0, login_at = ?, login_imap = ? WHERE id = ?").run(new Date().toISOString(), errText(e), inbox.id); }
-      else event("error", inbox.email, `Reading the inbox failed: ${friendlyError("imap", e, inbox, { onRailway: ON_RAILWAY })}`);
+      else if (isAuthError(e)) { pauseInbox(inbox, `${AUTH_PAUSE}. Save a new one, then resume.`); db.prepare("UPDATE inboxes SET login_ok = 0, login_at = ?, login_imap = ? WHERE id = ?").run(new Date().toISOString(), errText(e), inbox.id); }
+      else event("error", inbox.email, `Reading the inbox failed: ${friendlyError("imap", e, inbox, xopts())}`);
     }));
   return scanned;
 }
@@ -742,7 +825,7 @@ async function replyPhase(s, force) {
       await send(s, { from, to, ...email, inReplyTo: row.message_id, threadRoot: row.thread_root, depth: row.depth + 1 });
     } catch (e) {
       if (e.code === "PAUSED") db.prepare("UPDATE reply_queue SET done = 0 WHERE message_id = ?").run(row.message_id);
-      else event("error", from.email, `Reply failed: ${friendlyError("smtp", e, from, { onRailway: ON_RAILWAY })}`);
+      else event("error", from.email, `Reply failed: ${friendlyError("smtp", e, from, xopts())}`);
     }
   }
   // Replies that waited more than two days are dropped; a late reply looks odd.
@@ -757,6 +840,7 @@ async function tick({ force = false } = {}) {
   if (state.running || stopping) return false;
   const s = getSettings();
   housekeeping();
+  retestGoogle();
   if (s.paused && !DRY) { checkReach().catch(() => {}); return false; }
   state.running = true; state.forced = force; state.runningSince = new Date().toISOString(); state.phase = "connecting";
   let failed = null;
@@ -843,7 +927,8 @@ export async function overview() {
     inboxes.push({
       id: i.id, email: i.email, name: i.name, role: i.role, provider: i.provider, smtp_host: i.smtp_host, smtp_port: i.smtp_port,
       imap_host: i.imap_host, imap_port: i.imap_port, dkim_selector: i.dkim_selector, start_date: i.start_date, cap: i.cap,
-      paused: !!i.paused, pause_reason: i.pause_reason, hasPassword: !!i.password_enc, day: dayN, targetToday: target, slowed,
+      paused: !!i.paused, pause_reason: i.pause_reason, hasPassword: !!i.password_enc, signin: i.signin || "password", canSignIn: canSignIn(i),
+      day: dayN, targetToday: target, slowed,
       login: i.login_ok == null ? null : i.login_ok ? "ok" : "failed", loginAt: i.login_at, loginDetail: loginDetail(i),
       coldOk: i.role === "sender" ? (await camp.coldStatus(s, i)).ok : false,
       sentToday: db.prepare("SELECT COUNT(*) c FROM sent WHERE sender = ? AND day = ?").get(i.email, today).c, newToday: sentToday(i.email, today),
@@ -863,16 +948,17 @@ export async function overview() {
   for (const d of [...new Set(listInboxes().filter((i) => i.role === "sender").map((i) => domainOf(i.email)))])
     domains.push({ ...(await checkDomain(d)), signing: db.prepare("SELECT result, via, at FROM dkim_seen WHERE domain = ?").get(d) || null });
   const tot7 = daily.slice(-7).reduce((a, d) => ({ inbox: a.inbox + d.inbox, spam: a.spam + d.spam, sent: a.sent + d.sent }), { inbox: 0, spam: 0, sent: 0 });
-  const { openrouterKeyEnc, ...pub } = s;
+  const { openrouterKeyEnc, googleKeyEnc, ...pub } = s;
   const readySenders = inboxes.filter((i) => i.role === "sender" && !i.blocked);
   const readiness = { startBlock: startBlock(), senders: inboxes.filter((i) => i.role === "sender").length, readySenders: readySenders.length,
     plannedToday: readySenders.reduce((n, i) => n + i.targetToday, 0), newToday: readySenders.reduce((n, i) => n + Math.min(i.targetToday, i.newToday), 0) };
   return {
     readiness,
     now: new Date().toISOString(), today, dry: DRY, storage: { persistent: PERSISTENT, dataDir: DATA_DIR }, settings: { ...pub, aiKeySet: !!openrouterKey(s), aiKeyFromEnv: !openrouterKeyEnc && !!process.env.OPENROUTER_API_KEY },
+    google: googleInfo(),
     limits: Object.fromEntries(Object.entries(SETTINGS).filter(([, v]) => typeof v.def === "number").map(([k, v]) => [k, [v.min, v.max]])),
     scheduler: schedulerInfo(),
-    network: { onRailway: ON_RAILWAY, checking: NET_CHECK, results: [...reach.values()].map(({ host, port, kind, ok, error, at }) => ({ host, port, kind, ok, error, at: new Date(at).toISOString() })) },
+    network: { onRailway: ON_RAILWAY, checking: NET_CHECK, results: reachNow().map(({ host, port, kind, ok, error, at }) => ({ host, port, kind, ok, error, at: new Date(at).toISOString() })) },
     totals: { sentToday: daily.at(-1).sent, repliesToday: daily.at(-1).replies, sent7d: tot7.sent, placement7d: tot7.inbox + tot7.spam ? Math.round((100 * tot7.inbox) / (tot7.inbox + tot7.spam)) : null, rescued7d: tot7.spam,
       queued: db.prepare("SELECT COUNT(*) c FROM reply_queue WHERE done = 0").get().c,
       sentEver: db.prepare("SELECT COUNT(*) c FROM sent").get().c, seenEver: db.prepare("SELECT COUNT(*) c FROM seen").get().c },
@@ -927,24 +1013,32 @@ const isAuthError = (e) => e?.authenticationFailed || /AUTHENTICATIONFAILED|Inva
 // Each side of the last login test, with the reason and the fix when it failed.
 function loginDetail(i) {
   if (i.login_ok == null) return null;
-  const one = (kind, raw) => (raw == null ? null : raw === "ok" ? { ok: true } : { ok: false, ...explainMailError(kind, raw, i, { onRailway: ON_RAILWAY }) });
+  const one = (kind, raw) => (raw == null ? null : raw === "ok" ? { ok: true } : { ok: false, ...explainMailError(kind, raw, i, xopts()) });
   return { smtp: one("smtp", i.login_smtp), imap: one("imap", i.login_imap) };
 }
 
-async function testInbox(i) {
+// auto: a retest nobody asked for. A failure that repeats the last one isn't logged again.
+async function testInbox(i, { auto = false } = {}) {
   await checkReach({ force: true, inboxes: [i], retest: false });
   const out = { smtp: null, imap: null };
   // A server that can't be reached would only time out after 20 seconds, so say so straight away.
   const cut = (host, port) => { const r = reach.get(reachKey(host, port)); return r && !r.ok ? `connect ${r.error} ${host}:${port}` : null; };
-  out.smtp = cut(i.smtp_host, i.smtp_port);
-  if (!out.smtp) try { transports.delete(i.email); await transport(i).verify(); out.smtp = "ok"; } catch (e) { out.smtp = errText(e); }
-  out.imap = cut(i.imap_host, i.imap_port);
+  const st = sendTarget(i);
+  out.smtp = cut(st.host, st.port);
+  if (usesGoogle(i)) {
+    // Signs in as the inbox and opens its mailbox through the Gmail API. Nothing is sent.
+    if (!out.smtp) try { google.forget(i.email); await google.profile(i.email); out.smtp = "ok"; } catch (e) { out.smtp = errText(e); }
+    // Reading signs in the same way, so a refused sign-in would only be refused again.
+    if (/^Google sign-in (refused|is chosen)/.test(out.smtp)) out.imap = out.smtp;
+  } else if (!out.smtp) try { transports.delete(i.email); await transport(i).verify(); out.smtp = "ok"; } catch (e) { out.smtp = errText(e); }
+  out.imap ??= cut(i.imap_host, i.imap_port);
   if (!out.imap) try { await withImap(i, async (c) => { await c.list(); }, Math.min(60000, IMAP_DEADLINE_MS)); out.imap = "ok"; } catch (e) { out.imap = errText(e); }
   const ok = out.smtp === "ok" && out.imap === "ok";
+  const before = getInbox(i.id) || i, same = !ok && before.login_ok === 0 && before.login_smtp === out.smtp && before.login_imap === out.imap;
   db.prepare("UPDATE inboxes SET login_ok = ?, login_at = ?, login_smtp = ?, login_imap = ? WHERE id = ?").run(ok ? 1 : 0, new Date().toISOString(), out.smtp, out.imap, i.id);
   const detail = loginDetail({ ...i, login_ok: ok ? 1 : 0, login_smtp: out.smtp, login_imap: out.imap });
   const says = [["Sending", detail.smtp], ["Reading", detail.imap]].filter(([, d]) => !d.ok).map(([k, d]) => `${k} failed: ${d.why}`).join(" ");
-  event(ok ? "info" : "error", i.email, ok ? "Login test passed: sending and reading both work" : `Login test failed. ${says}`);
+  if (!(auto && same)) event(ok ? "info" : "error", i.email, ok ? `Login test passed: sending and reading both work${usesGoogle(i) ? " with Google sign-in" : ""}` : `Login test failed. ${says}`);
   return { ...out, ok, detail };
 }
 
@@ -973,7 +1067,7 @@ async function api(req, res, url) {
   if (p === "/api/status" && m === "GET") return reply(200, { paused: getSettings().paused, scheduler: schedulerInfo() });
   if (p === "/api/net-check" && m === "POST") {
     await checkReach({ force: true });
-    return reply(200, { results: [...reach.values()].map(({ host, port, kind, ok, error }) => ({ host, port, kind, ok, error })), startBlock: startBlock() });
+    return reply(200, { results: reachNow().map(({ host, port, kind, ok, error }) => ({ host, port, kind, ok, error })), startBlock: startBlock() });
   }
   if (p === "/api/mail" && m === "GET") return reply(200, recentMail(Number(url.searchParams.get("limit") || 50), url.searchParams.get("inbox")));
   if (p === "/api/settings" && m === "PUT") {
@@ -1016,13 +1110,25 @@ async function api(req, res, url) {
   if (p === "/api/errors/clear" && m === "POST") { db.prepare("DELETE FROM events WHERE level = 'error'").run(); return reply(200, { ok: true }); }
   if (await camp.api(req, res, url, reply)) return;
   if (p === "/api/inboxes" && m === "POST") return reply(200, { id: saveInbox(await readJson(req)).id });
+  // Switches every Google Workspace inbox to Google sign-in at once. Personal Gmail stays on app passwords.
+  if (p === "/api/inboxes/use-google" && m === "POST") {
+    if (!googleAccount()) return reply(400, { error: "Save the Google service-account key first (Settings, Google sign-in)." });
+    const switched = [], skipped = [];
+    for (const i of listInboxes().filter((x) => x.provider === "google" && !usesGoogle(x))) {
+      if (PERSONAL_GMAIL.test(i.email)) { skipped.push({ email: i.email, why: "personal Gmail keeps its app password" }); continue; }
+      saveInbox({ signin: "google" }, i.id); switched.push(i.id);
+    }
+    return reply(200, { switched, skipped });
+  }
   if (p === "/api/inboxes/bulk" && m === "POST") {
     // One inbox per line: email, app password, sender name (name optional). Shared provider, role and start date.
-    const { lines = "", provider, role, start_date } = await readJson(req);
+    // With Google sign-in there's no password, so each line is: email, sender name.
+    const { lines = "", provider, role, start_date, signin } = await readJson(req);
     const results = [];
     for (const line of String(lines).split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 100)) {
-      const [email, password, ...name] = line.split(/[,;\t]/).map((x) => x.trim());
-      try { saveInbox({ email, password, name: name.join(" "), provider, role, start_date }); results.push({ email, ok: true }); }
+      const parts = line.split(/[,;\t]/).map((x) => x.trim());
+      const [email, password, ...name] = signin === "google" ? [parts[0], "", ...parts.slice(1)] : parts;
+      try { saveInbox({ email, password, name: name.join(" "), provider, role, start_date, ...(signin ? { signin } : {}) }); results.push({ email, ok: true }); }
       catch (e) { results.push({ email: email || line.slice(0, 40), ok: false, error: e.message }); }
     }
     return reply(200, { results });
@@ -1038,7 +1144,7 @@ async function api(req, res, url) {
       return reply(200, { ok: true });
     }
     if (im[2] === "/test" && m === "POST") {
-      if (!i.password_enc && !DRY) return reply(400, { error: `Save an app password for ${i.email} first: press Edit, paste it, then Save.` });
+      if (!canSignIn(i) && !DRY) return reply(400, { error: usesGoogle(i) ? NO_GOOGLE_KEY : `Save an app password for ${i.email} first: press Edit, paste it, then Save.` });
       return reply(200, await testInbox(i));
     }
     if (im[2] === "/send-test" && m === "POST") {
@@ -1109,9 +1215,11 @@ process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
 
 camp = createCampaigns({ db, DRY, event, getSettings, listInboxes, getInbox, blockedReason, dailyTarget, placement, localParts,
-  daysAgo, smtpSend, domainOf, EMAIL_RE, readJson, first, pickOne, rand });
+  daysAgo, deliver, domainOf, EMAIL_RE, readJson, first, pickOne, rand });
 
 if (ONCE) { await tick({ force: true }); console.log(JSON.stringify((await overview()).totals, null, 2)); process.exit(0); }
 serve();
 schedule();
 tick().catch((e) => event("error", null, e.message));
+// Google sign-ins that failed are tried again once 15 minutes have passed, whatever the cycle length.
+setInterval(() => { if (!stopping) retestGoogle(); }, 60000).unref();

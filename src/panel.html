@@ -109,6 +109,10 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .fixbox b{color:var(--text)}.fixbox details{margin-top:4px}.fixbox summary{cursor:pointer;color:var(--muted)}
 .fixbox code{word-break:break-all;white-space:normal}
 .banner li .row{margin-top:6px}
+/* Google sign-in card */
+.gsteps{margin:8px 0 4px;padding-left:20px;font-size:14px}.gsteps li{margin:6px 0}.gsteps .note{font-size:13px;color:var(--muted);margin-top:4px}
+.gstate{display:grid;gap:6px;font-size:14px;margin:4px 0 8px}.gstate .ok{color:var(--good-text);font-weight:700}
+#gKey{font:12px/1.4 ui-monospace,monospace;min-height:72px}
 #login{min-height:100vh;display:grid;place-items:center;padding:16px}
 #login .card{width:min(380px,100%)}
 .subnav{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line)}
@@ -235,10 +239,10 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
 
   <!-- INBOXES -->
   <section data-panel="inboxes" class="hidden">
-    <details class="howto" data-howto="inboxes"><summary>How to use this page</summary><div class="in"><ol><li>Create an app password for each inbox. The setup checklist on Overview has the steps and links.</li>
-<li>Press <b>Add several</b> and paste one line per inbox: <code>email, app password, name</code>.</li>
+    <details class="howto" data-howto="inboxes"><summary>How to use this page</summary><div class="in"><ol><li>For Google Workspace inboxes, set up <b>Google sign-in</b> once under Settings. Then no inbox needs an app password. Otherwise, create an app password for each inbox.</li>
+<li>Press <b>Add several</b> and paste one line per inbox: <code>email, name</code> with Google sign-in, or <code>email, app password, name</code>.</li>
 <li>Each inbox tests its login by itself when you save its app password. Both sending and reading should pass. If one fails, the card says why and what to do.</li>
-<li>Optional: add one or two seeds at other providers.</li></ol><div class="btnref"><span class="k">Add several</span><span>Adds many inboxes at once, one line each. Each starts on day 1 of its own ramp.</span><span class="k">Add inbox</span><span>Adds one inbox. Under Server settings you can use a provider other than Google.</span><span class="k">Pause / Resume</span><span>Stops sending from this inbox only. It still reads its mail, so replies are caught.</span><span class="k">Test login</span><span>Signs in to send and to read, without sending anything. The card then shows each result, and for a failure the reason and the fix.</span><span class="k">Send one now</span><span>Sends one real warm-up email to another of your inboxes. It counts toward today's limit.</span><span class="k">Edit</span><span>Changes the name, app password, daily cap or day 1. The address can't change.</span><span class="k">Remove</span><span>Deletes the inbox. Its history stays, and leads it was emailing wait in Review.</span></div></div></details>
+<li>Optional: add one or two seeds at other providers.</li></ol><div class="btnref"><span class="k">Add several</span><span>Adds many inboxes at once, one line each. Each starts on day 1 of its own ramp.</span><span class="k">Add inbox</span><span>Adds one inbox. Under Server settings you can use a provider other than Google.</span><span class="k">Pause / Resume</span><span>Stops sending from this inbox only. It still reads its mail, so replies are caught.</span><span class="k">Test login</span><span>Signs in to send and to read, without sending anything. The card then shows each result, and for a failure the reason and the fix.</span><span class="k">Send one now</span><span>Sends one real warm-up email to another of your inboxes. It counts toward today's limit.</span><span class="k">Edit</span><span>Changes the name, how it signs in, the app password, daily cap or day 1. The address can't change.</span><span class="k">Remove</span><span>Deletes the inbox. Its history stays, and leads it was emailing wait in Review.</span></div></div></details>
     <div class="row spread" style="margin-bottom:12px"><p class="muted small" style="margin:0;flex:1;min-width:220px">Senders warm up on the ramp. Seeds are inboxes at other providers (a personal Gmail or Outlook). They only receive and reply, which shows how other providers treat your mail.</p><div class="row"><button type="button" class="qh" data-help="roles" aria-label="Senders and seeds" aria-expanded="false">?</button><button class="btn" id="bulkBtn">Add several</button><button class="btn primary" id="addInboxBtn">Add inbox</button></div></div>
     <div id="inboxCards" class="grid g2"></div>
   </section>
@@ -344,7 +348,8 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
   <section data-panel="settings" class="hidden">
     <details class="howto" data-howto="settings"><summary>How to use this page</summary><div class="in"><ol><li>The defaults are safe for new domains. Most people only set the <b>time zone</b>, <b>working hours</b> and the <b>OpenRouter key</b>.</li>
 <li>Every number has a hard limit, so a typo can't flood a new domain.</li>
-<li>Press <b>Save settings</b> at the bottom. Changes apply from the next cycle.</li></ol><div class="btnref"><span class="k">Write a test email</span><span>Asks the AI for one warm-up email and shows it. Nothing is sent.</span><span class="k">Add</span><span>Adds addresses or whole domains to the do-not-email list.</span><span class="k">Save settings</span><span>Saves this page. The AI key is stored encrypted.</span></div></div></details>
+<li>Press <b>Save settings</b> at the bottom. Changes apply from the next cycle.</li>
+<li><b>Google sign-in</b> replaces app passwords for Google Workspace inboxes, and is the way to send while Railway blocks email.</li></ol><div class="btnref"><span class="k">Choose key file / Save key</span><span>Saves the Google service-account key, encrypted. The card then shows the client ID to allow in Google Admin.</span><span class="k">Use it for all Google inboxes</span><span>Switches every Google Workspace inbox to Google sign-in and tests each one.</span><span class="k">Write a test email</span><span>Asks the AI for one warm-up email and shows it. Nothing is sent.</span><span class="k">Add</span><span>Adds addresses or whole domains to the do-not-email list.</span><span class="k">Save settings</span><span>Saves this page. The AI key is stored encrypted.</span></div></div></details>
     <form id="settingsForm">
       <div class="card"><h2>Schedule<button type="button" class="qh" data-help="sSchedule" aria-label="What does this do?" aria-expanded="false">?</button></h2>
         <div class="form">
@@ -380,6 +385,28 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
           <label class="f">Halve volume when placement drops below (%)<input name="slowdownBelow" type="number" step="1"></label>
           <label class="f">Pause an inbox when placement drops below (%)<input name="autoPauseBelow" type="number" step="1"></label>
           <label class="toggle full"><input type="checkbox" name="requireDns"><span><b>Block sending until SPF, DKIM and DMARC are set</b><br><span class="muted small">Keep this on. Turning it off lets an unauthenticated domain send, which is how domains get burned.</span></span></label>
+        </div>
+      </div>
+      <div class="card" id="googleCard"><h2>Google sign-in (no app passwords)<button type="button" class="qh" data-help="sGoogle" aria-label="What does this do?" aria-expanded="false">?</button></h2>
+        <p class="muted small" style="margin-top:0">One key from Google Cloud signs the mailer in to every Google Workspace inbox. No app passwords are needed, and email goes out through Google's API, which Railway's Hobby plan doesn't block.</p>
+        <div id="googleState"></div>
+        <details id="gSteps"><summary>How to set it up (about 10 minutes)</summary>
+          <ol class="gsteps">
+            <li>Open <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">Google Cloud</a> signed in as a Workspace admin, and create a project. Any name works, like "Mailer".</li>
+            <li>In that project, open the <a href="https://console.cloud.google.com/apis/library/gmail.googleapis.com" target="_blank" rel="noopener">Gmail API</a> page and press <b>Enable</b>.</li>
+            <li>Open <a href="https://console.cloud.google.com/iam-admin/serviceaccounts/create" target="_blank" rel="noopener">IAM &amp; Admin, Service accounts, Create service account</a>. Name it "mailer", press <b>Create and continue</b>, skip the roles and press <b>Done</b>.</li>
+            <li>Open the new service account, then <b>Keys</b>, <b>Add key</b>, <b>Create new key</b>, <b>JSON</b>. A file downloads. Keep it private: once step 6 is done, it can read and send mail as any user in that Google Workspace.
+              <div class="note">If Google says key creation is blocked by an organization policy: open IAM &amp; Admin, <b>Organization policies</b>, find "Disable service account key creation", press <b>Manage policy</b>, choose Override, set it to <b>Not enforced</b> and save. Your account may first need the Organization Policy Administrator role, which a super admin adds under IAM for the whole organization.</div></li>
+            <li>Below, press <b>Choose key file</b> and pick that file. Its client ID then shows above.</li>
+            <li>In <a href="https://admin.google.com/ac/owl/domainwidedelegation" target="_blank" rel="noopener">Google Admin</a>, open Security, Access and data control, API controls, <b>Manage Domain Wide Delegation</b>, and press <b>Add new</b>. Paste the client ID, enter the scope <code>https://mail.google.com/</code> and press <b>Authorize</b>. If your sending domains are in separate Google Workspace accounts, do this in each one.</li>
+            <li>Check IMAP is on in Google Admin: Apps, Google Workspace, Gmail, End User Access, POP and IMAP access.</li>
+            <li>Press <b>Use it for all Google inboxes</b> above. Each inbox then tests its sign-in. Google can take a few minutes to apply the delegation, and the mailer tries again every 15 minutes until it works.</li>
+          </ol>
+          <p class="muted small" style="margin:0">Personal Gmail seeds can't use this, so they keep their app passwords. On Railway's Hobby plan they still receive and get read, but can't reply.</p>
+        </details>
+        <div class="form" style="margin-top:10px">
+          <label class="f full">Service-account key<textarea id="gKey" rows="3" spellcheck="false" autocomplete="off" placeholder='Choose the file, or paste what is in it: {"type": "service_account", ...}'></textarea><span class="muted small">Stored encrypted, and never shown again.</span></label>
+          <div class="full row"><label class="btn" style="cursor:pointer">Choose key file<input type="file" id="gFile" accept=".json,application/json" hidden></label><button type="button" class="btn primary" id="gSave">Save key</button><button type="button" class="btn danger" id="gRemove" hidden>Remove key</button></div>
         </div>
       </div>
       <div class="card"><h2>AI writer (OpenRouter)<button type="button" class="qh" data-help="sAi" aria-label="What does this do?" aria-expanded="false">?</button></h2>
@@ -433,7 +460,7 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
       <span class="pill good">Warming up</span><span>All good. The inbox is sending on its ramp.</span>
       <span class="pill warn">Slowed down</span><span>Placement dipped below the slowdown line, so volume is halved until it recovers. Nothing to do.</span>
       <span class="pill warn">Paused</span><span>You paused it, or a safety rule did. The reason is shown on the inbox. Fix that first, then press Resume.</span>
-      <span class="pill bad">Blocked</span><span>It can't send: DNS is missing for its domain, no app password is saved, its last login test failed, or this server can't reach its mail server. The inbox card says which.</span>
+      <span class="pill bad">Blocked</span><span>It can't send: DNS is missing for its domain, it has no way to sign in (no app password or Google key), its last login test failed, or this server can't reach its mail server. The inbox card says which.</span>
       <span class="pill info">Seed</span><span>Receives and replies only. Used to see how outside providers treat your mail.</span>
     </div></div>
     <div class="card"><h2>Your daily two-minute check</h2><ol style="margin:0;padding-left:20px">
@@ -484,7 +511,8 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
       <label class="f">Sender name<input name="name" placeholder="Saurabh Singh"></label>
       <label class="f">Role<select name="role"><option value="sender">Sender (warms up)</option><option value="seed">Seed (receives and replies)</option></select></label>
       <label class="f">Provider<select name="provider"><option value="google">Google Workspace / Gmail</option><option value="microsoft">Microsoft 365 / Outlook</option><option value="zoho">Zoho</option><option value="custom">Other (custom)</option></select></label>
-      <label class="f full">App password<input name="password" type="password" autocomplete="new-password" placeholder="16-character app password"><span class="muted small" id="pwHint">Google: Account, then Security, then 2-Step Verification, then App passwords.</span></label>
+      <label class="f full" id="signinRow">Sign in with<select name="signin"><option value="google">Google sign-in (no app password)</option><option value="password">App password</option></select><span class="muted small" id="signinHint"></span></label>
+      <label class="f full" id="pwRow">App password<input name="password" type="password" autocomplete="new-password" placeholder="16-character app password"><span class="muted small" id="pwHint">Google: Account, then Security, then 2-Step Verification, then App passwords.</span></label>
       <label class="f">Warm-up day 1<input name="start_date" type="date"></label>
       <label class="f">Own daily cap (optional)<input name="cap" type="number" min="1" max="50" placeholder="uses ramp cap"></label>
       <details class="full"><summary class="small muted">Server settings</summary>
@@ -503,10 +531,11 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
 <dialog id="bulkDlg">
   <form id="bulkForm" method="dialog">
     <h2>Add several inboxes</h2>
-    <p class="muted small">One inbox per line: <b>email, app password, sender name</b>. Each new inbox starts on day 1 of its own ramp, so adding inboxes later never shocks the others.</p>
-    <label class="f"><textarea name="lines" rows="7" placeholder="saurabh@getpitchpersona.com, abcd efgh ijkl mnop, Saurabh Singh&#10;hello@trypitchpersona.com, qrst uvwx yzab cdef, Saurabh Singh"></textarea></label>
+    <p class="muted small"><span id="bulkFmt">One inbox per line: <b>email, app password, sender name</b>.</span> Each new inbox starts on day 1 of its own ramp, so adding inboxes later never shocks the others.</p>
+    <label class="f"><textarea name="lines" rows="7" placeholder="first@yourdomain.com, abcd efgh ijkl mnop, First Sender&#10;second@otherdomain.com, qrst uvwx yzab cdef, Second Sender"></textarea></label>
     <div class="form" style="margin-top:12px">
       <label class="f">Provider<select name="provider"><option value="google">Google Workspace / Gmail</option><option value="microsoft">Microsoft 365 / Outlook</option><option value="zoho">Zoho</option></select></label>
+      <label class="f" id="bulkSignin">Sign in with<select name="signin"><option value="google">Google sign-in</option><option value="password">App password</option></select></label>
       <label class="f">Role<select name="role"><option value="sender">Sender</option><option value="seed">Seed</option></select></label>
       <label class="f">Warm-up day 1<input name="start_date" type="date"></label>
     </div>
@@ -546,7 +575,8 @@ async function api(path,opts={}){
 }
 // Notifications. toast() for good news (fades), fail() for problems (stays until closed).
 // Links in the text become clickable.
-const linkify=t=>esc(t).replace(/https?:\/\/[^\s<)"']+[^\s<)"'.,;:]/g,u=>`<a href="${u}" target="_blank" rel="noopener">${u.replace(/^https:\/\//,'')}</a>`);
+// Google's mail scope is something to copy exactly, not a page to open.
+const linkify=t=>esc(t).replace(/https?:\/\/[^\s<)"']+[^\s<)"'.,;:]/g,u=>u==='https://mail.google.com/'?`<code>${u}</code>`:`<a href="${u}" target="_blank" rel="noopener">${u.replace(/^https:\/\//,'')}</a>`);
 function notify({kind='ok',title,msg='',ms,actions=[]}){
   const box=$('#toasts'), el=document.createElement('div');
   el.className='toast '+kind; el.setAttribute('role',kind==='error'?'alert':'status');
@@ -676,9 +706,9 @@ function render(){
   S.domains.filter(d=>!d.ok&&d.error).forEach(d=>probs.push(['warn',esc(d.error)+' Sending from it waits until then.']));
   S.domains.filter(d=>!d.ok&&!d.error).forEach(d=>probs.push(['bad',`${esc(d.domain)} is missing ${['spf','dkim','dmarc'].filter(k=>!d[k]).map(k=>k.toUpperCase()).join(', ')}. ${s.requireDns?'Sending from it is blocked.':' <b>The DNS gate is off in Settings, so it can still send, and its mail will likely land in spam.</b>'}`]));
   S.inboxes.filter(i=>i.paused&&i.pause_reason).forEach(i=>probs.push(['bad',`${esc(i.email)} paused itself: ${esc(i.pause_reason)}`]));
-  S.inboxes.filter(i=>!i.hasPassword).forEach(i=>probs.push(['warn',`${esc(i.email)} has no app password saved.`]));
+  S.inboxes.filter(i=>!i.canSignIn).forEach(i=>probs.push(['warn',i.signin==='google'?`${esc(i.email)} uses Google sign-in, but no Google key is saved under Settings.`:`${esc(i.email)} has no app password saved.`]));
   const net=netProblem(); if(net)probs.unshift(['bad',net]);
-  S.inboxes.filter(i=>i.hasPassword&&i.login==='failed'&&!i.paused).forEach(i=>{const f=loginFailures(i).filter(x=>!(net&&/_blocked$/.test(x.code)));
+  S.inboxes.filter(i=>i.canSignIn&&i.login==='failed'&&!i.paused).forEach(i=>{const f=loginFailures(i).filter(x=>!(net&&/_blocked$/.test(x.code)));
     if(!f.length&&net)return;
     probs.push(['bad',`<b>${esc(i.email)}</b> can't sign in. ${f.length?f.map(x=>`${esc(x.label)} failed: ${esc(x.why)} <b>Fix:</b> ${linkify(x.fix)}`).join(' '):'Press Test login to see why.'}
       <div class="row"><button class="btn sm" data-g="test" data-id="${i.id}">Test login</button><button class="btn sm" data-g="edit" data-id="${i.id}">Edit inbox</button></div>`]);});
@@ -722,6 +752,7 @@ function render(){
   renderInboxCards();
   renderEvents();
   renderGuide();
+  renderGoogle();
   const f=$('#mailFilter'), cur=f.value;
   f.innerHTML='<option value="">All inboxes</option>'+S.inboxes.map(i=>`<option ${i.email===cur?'selected':''}>${esc(i.email)}</option>`).join('');
 }
@@ -732,26 +763,34 @@ function loginFailures(i){const d=i.loginDetail||{};
   const f=[['Sending',d.smtp],['Reading',d.imap]].filter(([,x])=>x&&!x.ok).map(([label,x])=>({label,...x}));
   return f.length===2&&f[0].code===f[1].code&&f[0].fix===f[1].fix?[{...f[0],label:'Sending and reading'}]:f;}
 // One banner item when this server can't reach a mail server at all, instead of one per inbox.
+const PERSONAL=/@(gmail|googlemail)\.com$/i;
+// Google Workspace inboxes still on app passwords, which could switch to Google sign-in.
+const switchable=()=>S.inboxes.filter(i=>i.provider==='google'&&i.signin!=='google'&&!PERSONAL.test(i.email));
 function netProblem(){
   const cut=blockedNet(); if(!cut.length)return null;
-  const smtp=cut.filter(r=>r.kind==='smtp'), rail=S.network.onRailway&&smtp.length;
+  const smtp=cut.filter(r=>r.kind==='smtp'), rail=S.network.onRailway&&smtp.length, apiOnly=!smtp.length&&cut.every(r=>r.kind==='api');
   const where=cut.map(r=>`${esc(r.host)} on port ${r.port}`).join(' and ');
-  const pwOk=S.inboxes.some(i=>i.loginDetail?.imap?.ok);
-  return `<b>${rail?'Railway is blocking outgoing email.':"This server can't connect to your mail server."}</b> The mailer can't open a connection to ${where}${rail?", because Railway's Free, Trial and Hobby plans block every email-sending (SMTP) connection":''}. ${smtp.length?'No inbox can send until it connects.':'Reading mail waits until it connects.'}
-    <div class="small" style="margin-top:4px"><b>Fix:</b> ${rail?'In Railway, upgrade this workspace to the Pro plan, then redeploy the mailer (Railway only opens the email ports on a new deploy). The mailer checks the connection when it starts and tests the logins again by itself.':'Check the host and port under Edit, Server settings, or allow outgoing connections on that port. Then press Re-check connection.'}${pwOk?' Reading mail already works, so the app passwords are right.':''}</div>
-    <div class="row"><button class="btn sm primary" data-g="netcheck">Re-check connection</button></div>`;
+  const pwOk=S.inboxes.some(i=>i.signin!=='google'&&i.loginDetail?.imap?.ok), viaGoogle=S.inboxes.some(i=>i.signin==='google'&&i.canSignIn), sw=switchable().length;
+  const fix=rail?(sw?`Switch your Google inboxes to <b>Google sign-in</b>. It sends through Google's API, which Railway doesn't block, and needs no app passwords. The other way is to upgrade this Railway workspace to the Pro plan, then redeploy the mailer.`
+      :'In Railway, upgrade this workspace to the Pro plan, then redeploy the mailer (Railway only opens the email ports on a new deploy). The mailer checks the connection when it starts and tests the logins again by itself.')
+    :apiOnly?"This is usually brief. The connection is checked again every 5 minutes, or press Re-check connection to try now. If it lasts, check that this server can make outgoing HTTPS connections."
+    :'Check the host and port under Edit, Server settings, or allow outgoing connections on that port. Then press Re-check connection.';
+  const btn=rail&&sw?(S.google?`<button class="btn sm" data-g="usegoogle">Use Google sign-in for ${sw===1?'1 inbox':`${sw} inboxes`}</button>`:`<button class="btn sm" data-g="gsetup">Set up Google sign-in</button>`):'';
+  return `<b>${rail?'Railway is blocking outgoing email.':apiOnly?"This server can't reach Google's servers.":"This server can't connect to your mail server."}</b> The mailer can't open a connection to ${where}${rail?", because Railway's Free, Trial and Hobby plans block every email-sending (SMTP) connection":''}. ${smtp.length?(viaGoogle?"Inboxes that sign in with an app password can't send until it connects.":'No inbox can send until it connects.'):apiOnly?"Inboxes using Google sign-in can't send until it connects.":'Reading mail waits until it connects.'}
+    <div class="small" style="margin-top:4px"><b>Fix:</b> ${fix}${pwOk&&rail?' Reading mail already works, so the app passwords are right.':''}</div>
+    <div class="row">${btn}<button class="btn sm ${btn?'':'primary'}" data-g="netcheck">Re-check connection</button></div>`;
 }
 function loginBlock(i){
   const line=(ic,cls,txt)=>`<div class="lres"><div class="ln"><span class="${cls}">${ic}</span><span>${txt}</span></div></div>`;
   if(testing.has(i.id))return `<div class="lres"><div class="ln"><span class="spin" style="color:var(--accent-text)"></span><span>Testing sending and reading. This can take up to a minute.</span></div></div>`;
-  if(!i.hasPassword)return line('✗','no','No app password saved. Press <b>Edit</b> and paste it.');
+  if(!i.canSignIn)return line('✗','no',i.signin==='google'?'Google sign-in is chosen, but no Google key is saved. Add it under <b>Settings, Google sign-in</b>.':'No app password saved. Press <b>Edit</b> and paste it.');
   if(i.login==null)return line('○','muted','<span class="muted">Not tested yet. Press <b>Test login</b>.</span>');
   const d=i.loginDetail||{};
   if(i.login==='failed'&&!d.smtp&&!d.imap)return line('✗','no',`Failed ${fmtTime(i.loginAt)}. Press <b>Test login</b> again to see why.`);
   const row=(label,x)=>!x?'':x.ok?`<div class="ln"><span class="ok">✓</span><span>${label} works</span></div>`
     :`<div class="ln"><span class="no">✗</span><span><b>${label} failed.</b> ${esc(x.why)}</span><div class="fixbox"><b>Fix:</b> ${linkify(x.fix)}<details><summary>What the server said</summary><code>${esc(x.raw)}</code></details></div></div>`;
   const same=d.smtp&&d.imap&&!d.smtp.ok&&!d.imap.ok&&d.smtp.code===d.imap.code&&d.smtp.fix===d.imap.fix;
-  return `<div class="lres">${same?row('Sending and reading',d.smtp):row('Sending (SMTP)',d.smtp)+row('Reading (IMAP)',d.imap)}<div class="muted small">Tested ${fmtTime(i.loginAt)}</div></div>`;
+  return `<div class="lres">${same?row('Sending and reading',d.smtp):row(i.signin==='google'?'Sending (Gmail API)':'Sending (SMTP)',d.smtp)+row('Reading (IMAP)',d.imap)}<div class="muted small">Tested ${fmtTime(i.loginAt)}</div></div>`;
 }
 const testing=new Set();
 // Tests one inbox's login, shows progress on its card, and says how it went.
@@ -797,7 +836,7 @@ function renderInboxCards(){
     ${i.blocked&&!/^Its last login test failed/.test(i.blocked)?`<div class="small" style="color:${i.paused?'var(--warn-text)':'var(--bad-text)'}">${esc(i.blocked)}</div>`:''}
     ${loginBlock(i)}
     ${i.role==='sender'?`<div class="chart" data-ramp="${i.id}"></div><div class="legend" style="margin:0"><span><i style="background:var(--s1)"></i>Sent</span><span><i style="background:var(--ref);height:2px"></i>Planned</span></div>`:''}
-    <dl class="kv"><dt>Warm-up day</dt><dd>${i.role==='seed'?'–':i.day||'starts '+shortDay(i.start_date)}</dd><dt>Sent 7d</dt><dd>${i.sent7d}</dd><dt>Received 7d</dt><dd>${i.received7d}</dd><dt>Errors 7d</dt><dd>${i.errors7d}</dd><dt>Password</dt><dd>${i.hasPassword?'Saved (encrypted)':'<span style="color:var(--bad-text)">Missing</span>'}</dd></dl>
+    <dl class="kv"><dt>Warm-up day</dt><dd>${i.role==='seed'?'–':i.day||'starts '+shortDay(i.start_date)}</dd><dt>Sent 7d</dt><dd>${i.sent7d}</dd><dt>Received 7d</dt><dd>${i.received7d}</dd><dt>Errors 7d</dt><dd>${i.errors7d}</dd><dt>Sign-in</dt><dd>${i.signin==='google'?(S.google?'Google sign-in':'<span style="color:var(--bad-text)">Google sign-in, key missing</span>'):i.hasPassword?'App password (encrypted)':'<span style="color:var(--bad-text)">No app password</span>'}</dd></dl>
     <div class="acts">
       <button class="btn sm" data-act="pause" data-id="${i.id}">${i.paused?'Resume':'Pause'}</button>
       <button class="btn sm" data-act="test" data-id="${i.id}" ${testing.has(i.id)?'disabled':''}>${testing.has(i.id)?'<span class="spin"></span> Testing…':'Test login'}</button>
@@ -831,28 +870,48 @@ function openInbox(i){
   editing=i; form.reset(); $('#inboxErr').textContent='';
   $('#inboxDlgTitle').textContent=i?'Edit '+i.email:'Add inbox';
   form.password.placeholder=i?.hasPassword?'Saved. Leave empty to keep it':'16-character app password';
-  form.password.required=!i; form.email.readOnly=!!i;
+  form.email.readOnly=!!i;
   const v=i||{provider:'google',role:'sender',start_date:S.today,...S.providers.google};
   for(const k of ['email','name','role','provider','start_date','cap','smtp_host','smtp_port','imap_host','imap_port','dkim_selector']) if(form[k]) form[k].value=v[k]??'';
-  dlg.showModal();
+  // A new Google inbox signs in with the saved Google key when there is one.
+  form.signin.value=i?(i.signin||'password'):S.google?'google':'password';
+  syncSignin(); dlg.showModal();
 }
+// The password box shows only when the inbox signs in with one.
+function syncSignin(){
+  const g=form.provider.value==='google'; if(!g)form.signin.value='password';
+  const useG=g&&form.signin.value==='google';
+  $('#signinRow').classList.toggle('hidden',!g); $('#pwRow').classList.toggle('hidden',useG);
+  form.password.required=!editing&&!useG;
+  $('#signinHint').textContent=!useG?'':PERSONAL.test(form.email.value)?"Personal Gmail can't use Google sign-in. Pick App password.":S.google?'Uses the Google key saved under Settings. Nothing to paste here.':'Save the Google key under Settings, Google sign-in first. Until then this inbox waits.';
+}
+form.signin.onchange=syncSignin; form.email.addEventListener('input',syncSignin);
 form.provider.onchange=()=>{const p=S.providers[form.provider.value];for(const k in p)form[k].value=p[k];
-  $('#pwHint').textContent={google:'Google: Account, then Security, then 2-Step Verification, then App passwords.',microsoft:'Microsoft: SMTP AUTH must be enabled for the mailbox, and use an app password.',zoho:'Zoho: Settings, then Security, then App Passwords.',custom:'Use the mailbox password or an app password.'}[form.provider.value];};
+  $('#pwHint').textContent={google:'Google: Account, then Security, then 2-Step Verification, then App passwords.',microsoft:'Microsoft: SMTP AUTH must be enabled for the mailbox, and use an app password.',zoho:'Zoho: Settings, then Security, then App Passwords.',custom:'Use the mailbox password or an app password.'}[form.provider.value];syncSignin();};
 form.onsubmit=async e=>{
   if(e.submitter?.value!=='save')return; e.preventDefault();
-  const body=Object.fromEntries(new FormData(form)); if(!body.password)delete body.password; body.cap=body.cap===''?null:Number(body.cap);
+  const body=Object.fromEntries(new FormData(form)); body.cap=body.cap===''?null:Number(body.cap);
+  if(body.provider!=='google')body.signin='password';
+  if(!body.password||body.signin==='google')delete body.password;
+  // A new password, or a switch to Google sign-in, gets tested straight away, so you know now rather than at the first send.
+  const testNow=!!body.password||(body.signin==='google'&&!!S.google&&editing?.signin!=='google');
   const done=busy(e.submitter,'Saving…');
   try{ const r=editing? await api('/api/inboxes/'+editing.id,{method:'PUT',body}) : await api('/api/inboxes',{method:'POST',body});
     dlg.close(); done(); await load(false);
-    // A new password gets tested straight away, so you know now rather than at the first send.
-    if(body.password){toast(`${body.email||editing.email} saved. Testing its login now…`);testLogin(r.id);}
-    else toast(editing?'Inbox saved':'Inbox added. Save its app password, then it tests the login.');
+    if(testNow){toast(`${body.email||editing.email} saved. Testing its ${body.signin==='google'?'Google sign-in':'login'} now…`);testLogin(r.id);}
+    else toast(editing?'Inbox saved':body.signin==='google'?'Inbox added. It signs in once the Google key is saved under Settings.':'Inbox added. Save its app password, then it tests the login.');
   }catch(err){done();$('#inboxErr').textContent=err.message;}
 };
 
 // Bulk add
 const bulk=$('#bulkDlg');
-$('#bulkBtn').onclick=()=>{$('#bulkForm').reset();$('#bulkForm').start_date.value=S.today;$('#bulkOut').innerHTML='';bulk.showModal();};
+$('#bulkBtn').onclick=()=>{const f=$('#bulkForm');f.reset();f.start_date.value=S.today;f.signin.value=S.google?'google':'password';$('#bulkOut').innerHTML='';syncBulk();bulk.showModal();};
+// With Google sign-in each line is just the address and name.
+function syncBulk(){const f=$('#bulkForm'), g=f.provider.value==='google'; if(!g)f.signin.value='password';
+  const useG=g&&f.signin.value==='google'; $('#bulkSignin').classList.toggle('hidden',!g);
+  $('#bulkFmt').innerHTML=useG?`One inbox per line: <b>email, sender name</b>. They sign in with the Google key${S.google?'':', once it is saved under Settings'}.`:'One inbox per line: <b>email, app password, sender name</b>.';
+  f.lines.placeholder=useG?'first@yourdomain.com, First Sender\nsecond@otherdomain.com, Second Sender':'first@yourdomain.com, abcd efgh ijkl mnop, First Sender\nsecond@otherdomain.com, qrst uvwx yzab cdef, Second Sender';}
+$('#bulkForm').provider.addEventListener('change',syncBulk); $('#bulkForm').signin.addEventListener('change',syncBulk);
 $('#bulkCancel').onclick=()=>bulk.close();
 $('#bulkForm').onsubmit=async e=>{
   if(e.submitter?.value!=='save')return; e.preventDefault();
@@ -860,7 +919,7 @@ $('#bulkForm').onsubmit=async e=>{
   try{const r=await api('/api/inboxes/bulk',{method:'POST',body:Object.fromEntries(new FormData(e.target))});
     $('#bulkOut').innerHTML=r.results.map(x=>`<div style="color:${x.ok?'var(--good-text)':'var(--bad-text)'}">${x.ok?'✓ Added':'✗ '+esc(x.error)}: ${esc(x.email)}</div>`).join('')||'Nothing to add.';
     if(r.results.every(x=>x.ok))e.target.lines.value=''; done(); await load(false);
-    const added=r.results.filter(x=>x.ok).map(x=>S.inboxes.find(i=>i.email===String(x.email).toLowerCase())).filter(i=>i&&i.hasPassword);
+    const added=r.results.filter(x=>x.ok).map(x=>S.inboxes.find(i=>i.email===String(x.email).toLowerCase())).filter(i=>i&&i.canSignIn);
     if(added.length){if(r.results.every(x=>x.ok))bulk.close();toast(`${plural(added.length,'inbox','inboxes')} added. Testing each login now…`);go('inboxes');testMany(added.map(i=>i.id));}
   }catch(err){done();$('#bulkOut').textContent=err.message;}
 };
@@ -868,7 +927,7 @@ $('#bulkForm').onsubmit=async e=>{
 // Header actions
 $('#toggleBtn').onclick=async()=>{
   const b=$('#toggleBtn'), starting=S.settings.paused, R=S.readiness||{};
-  if(starting&&!R.startBlock&&!R.readySenders){if(!confirm('No inbox can send yet. The Overview lists why (DNS, missing password or paused). Switch on anyway? Sending starts by itself once an inbox is ready.'))return;}
+  if(starting&&!R.startBlock&&!R.readySenders){if(!confirm('No inbox can send yet. The Overview lists why (DNS, no way to sign in, or paused). Switch on anyway? Sending starts by itself once an inbox is ready.'))return;}
   else if(starting&&!R.startBlock&&S.domains.some(d=>!d.ok)&&!confirm('Some domains fail the DNS check, so their inboxes stay blocked. Start the others?'))return;
   const done=busy(b,starting?'Checking…':'Pausing…'), prev=S.scheduler.lastCycle?.startedAt||null;
   try{await api('/api/pause',{method:'POST',body:{paused:!starting}});
@@ -895,7 +954,8 @@ $('#dnsBtn').onclick=async e=>{const b=e.currentTarget, done=busy(b,'Checking DN
 $('#clearErrBtn').onclick=async()=>{await api('/api/errors/clear',{method:'POST'});load(false);};
 
 // ── Setup guide: every step ticks itself off from live state ──────────────────
-const HOW_PASSWORDS=`<ol>
+const HOW_PASSWORDS=`<p style="margin:0 0 6px">Easiest for Google Workspace: set up <b>Google sign-in</b> under Settings first. Then each inbox needs only its address, no app password. <button class="btn sm" data-g="gsetup">Set up Google sign-in</button></p>
+<p class="muted small" style="margin:0">Or sign in with app passwords:</p><ol>
   <li>In <a href="https://admin.google.com" target="_blank" rel="noopener">Google Admin</a>, allow 2-Step Verification (Security, Authentication, 2-step verification) and turn on IMAP (Apps, Google Workspace, Gmail, End User Access, POP and IMAP access).</li>
   <li>Sign in as each inbox, turn on <a href="https://myaccount.google.com/signinoptions/twosv" target="_blank" rel="noopener">2-Step Verification</a>, then create an <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">app password</a> named Mailer. Copy the 16 letters.</li>
   <li>Add each inbox here as a <b>Sender</b> with its app password. To add several at once, write one line per inbox: <code>email, app password, name</code>.</li>
@@ -912,7 +972,7 @@ function onSendingDomain(h){return S.domains.some(d=>h===d.domain||h.endsWith('.
 
 function guideSteps(){
   const s=S.settings,R=S.readiness||{},t=S.totals,ins=S.inboxes,snd=ins.filter(i=>i.role==='sender'),seeds=ins.length-snd.length;
-  const doms=S.domains,pw=ins.filter(i=>i.hasPassword),okLogin=ins.filter(i=>i.login==='ok'),badLogin=ins.filter(i=>i.login==='failed'),untested=pw.filter(i=>i.login!=='ok');
+  const doms=S.domains,pw=ins.filter(i=>i.canSignIn),okLogin=ins.filter(i=>i.login==='ok'),badLogin=ins.filter(i=>i.login==='failed'),untested=pw.filter(i=>i.login!=='ok');
   const N=s.coldMinWarmDays,bestDay=Math.max(0,...snd.map(i=>i.day||0)),coldReady=snd.filter(i=>i.coldOk).length;
   const signed=d=>!!d.signing&&['pass','signed'].includes(d.signing.result), unsigned=doms.filter(d=>d.signing&&!signed(d));
   const blockedNow=s.paused||!!R.startBlock, net=netProblem();
@@ -925,15 +985,18 @@ function guideSteps(){
       body:`<p style="margin:0">Warm-up sends emails between your own inboxes, so it needs at least two. Add every inbox you want to warm up as a <b>Sender</b>, and keep your main domain's inboxes out.</p>
         <p class="note">Seeds are optional: personal Gmail or Outlook inboxes at other providers. They only receive and reply, which shows how outside providers treat your mail.</p>
         <div class="acts"><button class="btn primary sm" data-g="bulk">Add several at once</button><button class="btn sm" data-g="add">Add one inbox</button></div>`},
-    {id:'login',title:'Create app passwords and test each login',done:ins.length>=2&&okLogin.length===ins.length,prob:badLogin.length>0||!!net,
-      status:!ins.length?'Add inboxes first':`${okLogin.length} of ${ins.length} logins work`+(badLogin.length?`, ${badLogin.length} failed`:'')+(ins.length>pw.length?`, ${ins.length-pw.length} without a password`:'')+(net&&S.network.onRailway&&blockedNet().some(r=>r.kind==='smtp')?'. Railway is blocking outgoing email':net?". This server can't reach the mail server":''),
-      body:`<ol><li>In ${ext('https://admin.google.com','Google Admin')}, allow 2-Step Verification (Security, Authentication, 2-step verification) and turn on IMAP (Apps, Google Workspace, Gmail, End User Access, POP and IMAP access).</li>
+    {id:'login',title:'Connect your inboxes and test each login',done:ins.length>=2&&okLogin.length===ins.length,prob:badLogin.length>0||!!net,
+      status:!ins.length?'Add inboxes first':`${okLogin.length} of ${ins.length} logins work`+(badLogin.length?`, ${badLogin.length} failed`:'')+(ins.length>pw.length?`, ${ins.length-pw.length} can't sign in yet`:'')+(net&&S.network.onRailway&&blockedNet().some(r=>r.kind==='smtp')?'. Railway is blocking outgoing email':net?". This server can't reach the mail server":''),
+      body:`<p style="margin:0"><b>Google sign-in</b> (best for Google Workspace): one key from Google Cloud signs in to every inbox, with no app passwords.${S.network.onRailway?" It's also the way to send while Railway blocks email.":''} ${S.google?`The key is saved. ${switchable().length?`${plural(switchable().length,'Google inbox','Google inboxes')} still use${switchable().length===1?'s':''} an app password.`:''}`:'Settings, Google sign-in has the steps.'}</p>
+        <div class="acts" style="margin:8px 0 12px">${S.google?(switchable().length?`<button class="btn primary sm" data-g="usegoogle">Use Google sign-in for ${plural(switchable().length,'inbox','inboxes')}</button>`:''):'<button class="btn primary sm" data-g="gsetup">Set up Google sign-in</button>'}</div>
+        <p style="margin:0"><b>Or app passwords</b>${S.network.onRailway?", which can send only on Railway's Pro plan":''}:</p>
+        <ol><li>In ${ext('https://admin.google.com','Google Admin')}, allow 2-Step Verification (Security, Authentication, 2-step verification) and turn on IMAP (Apps, Google Workspace, Gmail, End User Access, POP and IMAP access).</li>
         <li>Sign in as each inbox, turn on ${ext('https://myaccount.google.com/signinoptions/twosv','2-Step Verification')}, then create an ${ext('https://myaccount.google.com/apppasswords','app password')} named Mailer and copy the 16 letters.</li>
-        <li>Paste it into the inbox here (Inboxes, Edit, App password).</li>
-        <li>Press <b>Test login</b>. It checks both sending (SMTP) and reading (IMAP).</li></ol>
+        <li>Paste it into the inbox here (Inboxes, Edit, App password).</li></ol>
+        <p class="note">Each inbox tests its login when it's set up. <b>Test login</b> checks sending and reading again, without sending anything.</p>
         ${net?`<div class="issue">${net}</div>`:''}
         ${badLogin.map(i=>{const f=loginFailures(i).filter(x=>!(net&&/_blocked$/.test(x.code)));return f.length||!net?`<div class="issue"><b>${esc(i.email)}</b>: ${f.length?f.map(x=>`${esc(x.label)} failed. ${esc(x.why)} <b>Fix:</b> ${linkify(x.fix)}`).join(' '):'failed. Press Test login again to see why.'}</div>`:'';}).join('')}
-        ${ins.length>pw.length?`<p class="prob">No app password yet: ${ins.filter(i=>!i.hasPassword).map(i=>esc(i.email)).join(', ')}.</p>`:''}
+        ${ins.length>pw.length?`<p class="prob">Can't sign in yet (no app password${ins.some(i=>i.signin==='google')&&!S.google?', or the Google key is missing':''}): ${ins.filter(i=>!i.canSignIn).map(i=>esc(i.email)).join(', ')}.</p>`:''}
         <div class="acts">${untested.length?`<button class="btn primary sm" data-g="testall">Test ${untested.length===1?'1 login':`${untested.length} logins`}</button>`:''}<button class="btn sm" data-goto="inboxes">Open Inboxes</button></div>`},
     {id:'dns',title:'Publish SPF, DKIM and DMARC',done:doms.length>0&&doms.every(d=>d.ok),prob:doms.some(d=>!d.ok),
       status:!doms.length?'Add a sending inbox first':`${doms.filter(d=>d.ok).length} of ${plural(doms.length,'domain')} pass`,
@@ -1021,7 +1084,15 @@ document.addEventListener('click',async e=>{
   if(act==='dkimyes'||act==='dkimno'){g.disabled=true;
     try{await api('/api/settings',{method:'PUT',body:{dkimConfirmed:act==='dkimyes'}});toast(act==='dkimyes'?'Marked done. It confirms itself once signed warm-up mail arrives.':'Unmarked.');}catch(err){fail(err.message);}
     return load(false);}
-  if(act==='testall')return testMany(S.inboxes.filter(i=>i.hasPassword&&i.login!=='ok').map(i=>i.id),g);
+  if(act==='testall')return testMany(S.inboxes.filter(i=>i.canSignIn&&i.login!=='ok').map(i=>i.id),g);
+  if(act==='gsetup'){go('settings');$('#gSteps').open=true;return setTimeout(()=>$('#googleCard').scrollIntoView({block:'start',behavior:'smooth'}),50);}
+  if(act==='copyid'){try{await navigator.clipboard.writeText(S.google.clientId);toast('Client ID copied. Paste it in Google Admin, Manage Domain Wide Delegation.');}catch{hint(`Client ID: ${S.google.clientId}`);}return;}
+  if(act==='usegoogle'){const done=busy(g,'Switching…');
+    try{const r=await api('/api/inboxes/use-google',{method:'POST'});done();await load(false);
+      if(r.switched.length){toast(`${plural(r.switched.length,'inbox','inboxes')} now use Google sign-in. Testing each one…`);await testMany(r.switched);}
+      else hint(r.skipped.length?`Nothing to switch. ${r.skipped.map(x=>`${x.email}: ${x.why}`).join('. ')}.`:'Every Google inbox already uses Google sign-in.');}
+    catch(err){done();fail(err.message,"Couldn't switch the inboxes");}
+    return;}
   if(act==='test')return testLogin(g.dataset.id);
   if(act==='edit'){const i=S.inboxes.find(x=>x.id==g.dataset.id);return i&&openInbox(i);}
   if(act==='netcheck'){const done=busy(g,'Checking…');
@@ -1039,8 +1110,8 @@ const HELP={
     <p><b>Start warm-up</b> switches the mailer on, or says what's missing. <b>Pause all</b> stops everything, campaigns included.</p><p><b>Run a cycle now</b> does one round straight away, even outside working hours. Limits still apply.</p>`},
   placement:{t:'Inbox placement',b:()=>`<p>The share of warm-up emails that landed in the inbox rather than spam, as seen by the inbox that received them.</p><ul><li>90% or more is healthy.</li><li>Below ${S.settings.slowdownBelow}%, that inbox sends half as much.</li><li>Below ${S.settings.autoPauseBelow}%, it pauses itself.</li></ul>`},
   dns:{t:'Domain authentication',b:`<p>SPF, DKIM and DMARC prove your mail really comes from your domain. Without all three, Gmail and Outlook send it to spam, so sending is blocked until they're found.</p><p>A passing result is kept for 6 hours. A failing domain is checked again every 15 minutes, or press <b>Re-check DNS</b> after changing a record.</p><p>DKIM also needs <b>Start authentication</b> clicked in Google Admin.</p>`},
-  roles:{t:'Senders and seeds',b:`<p><b>Sender</b>: an inbox on your sending domains. It warms up on the ramp and can later send campaigns.</p><p><b>Seed</b>: an inbox at another provider, like a personal Gmail or Outlook. It only receives and replies, which shows how outside providers treat your mail.</p><p><b>Add several</b> takes one line per inbox: <code>email, app password, name</code>.</p>`},
-  inboxActions:{t:'Inbox buttons',b:`<ul><li><b>Pause / Resume</b>: stops sending from this inbox only. It still reads mail, so replies are caught.</li><li><b>Test login</b>: signs in to send and to read, without sending anything. A failure shows the reason and the fix on the card.</li><li><b>Send one now</b>: sends one real warm-up email to another of your inboxes. It counts toward today's limit.</li><li><b>Edit</b>: change the name, app password, daily cap or day 1.</li><li><b>Remove</b>: deletes the inbox. History stays, and leads it was emailing wait in Review.</li></ul>`},
+  roles:{t:'Senders and seeds',b:`<p><b>Sender</b>: an inbox on your sending domains. It warms up on the ramp and can later send campaigns.</p><p><b>Seed</b>: an inbox at another provider, like a personal Gmail or Outlook. It only receives and replies, which shows how outside providers treat your mail.</p><p><b>Add several</b> takes one line per inbox: <code>email, name</code> with Google sign-in, or <code>email, app password, name</code>.</p>`},
+  inboxActions:{t:'Inbox buttons',b:`<ul><li><b>Pause / Resume</b>: stops sending from this inbox only. It still reads mail, so replies are caught.</li><li><b>Test login</b>: signs in to send and to read, without sending anything. A failure shows the reason and the fix on the card.</li><li><b>Send one now</b>: sends one real warm-up email to another of your inboxes. It counts toward today's limit.</li><li><b>Edit</b>: change the name, how it signs in (Google sign-in or app password), the daily cap or day 1.</li><li><b>Remove</b>: deletes the inbox. History stays, and leads it was emailing wait in Review.</li></ul>`},
   campaigns:{t:'How campaigns work',b:()=>`<ol><li><b>New campaign</b>, then add leads.</li><li>Check the sequence and preview it.</li><li>Pick inboxes and hours.</li><li><b>Send a test</b>, then <b>Start sending</b>.</li></ol><p>An inbox sends campaigns only after ${S.settings.coldMinWarmDays} warm-up days with ${S.settings.coldMinPlacement}% placement or more, and at most ${S.settings.coldDailyCap} campaign emails a day. A reply stops that person's sequence.</p>`},
   campButtons:{t:'Campaign buttons',b:`<ul><li><b>Start sending / Pause</b>: switches this campaign on or off. Leads keep their place.</li><li><b>Send a test</b>: sends step 1, filled in for the newest lead, to one of your own inboxes with [TEST] in the subject.</li><li><b>Archive</b>: ends the campaign. Unsent leads are skipped and history stays.</li></ul>`},
   leadStatus:{t:'Lead statuses',b:`<ul><li><b>Review</b>: waiting for you. Approve to queue them.</li><li><b>Scheduled</b>: the next email goes out at its time.</li><li><b>Replied</b>, <b>Bounced</b>, <b>Unsubscribed</b>: stopped for good, and kept out of every campaign.</li><li><b>Finished</b>: got every step.</li><li><b>Needs a fix</b>: a variable was missing, or 5 tries failed. Open it to see why, fix it, then Retry.</li><li><b>Skipped</b>: you stopped it.</li></ul>`},
@@ -1052,6 +1123,7 @@ const HELP={
   sRamp:{t:'Ramp',b:`<p>Warm-up emails per sending inbox per day. Day 1 sends <b>Day 1 emails</b>, then it adds <b>Add per day</b> until the <b>Daily cap</b>. Weekends send that fraction of a weekday.</p><p>The chart below previews the plan. Going slower is always safe. Going faster is how new domains get burned.</p>`},
   sBehaviour:{t:'Behaviour',b:`<ul><li><b>Reply rate</b>: the share of warm-up emails that get a reply.</li><li><b>Star rate</b>: the share that get starred.</li><li><b>Max replies per thread</b>: how long a back-and-forth can get.</li><li><b>Share sent to seeds</b>: how much goes to your outside inboxes.</li><li><b>Reply delay</b>: replies wait a random time in this range.</li></ul>`},
   sSafety:{t:'Safety',b:`<p>Placement is checked per inbox over the last few days. Below the first number its volume halves. Below the second, it pauses itself.</p><p>Keep <b>Block sending until SPF, DKIM and DMARC are set</b> on.</p>`},
+  sGoogle:{t:'Google sign-in',b:()=>`<p>A Google Cloud <b>service account</b> that your Workspace admin allows to act for your users. The mailer uses it to sign in as each inbox, so no inbox needs 2-Step Verification or an app password.</p><ul><li>Sending goes through the <b>Gmail API</b> over HTTPS, so it works on Railway's Hobby plan, which blocks email ports.</li><li>Reading still uses IMAP, with the same sign-in.</li><li>It works only for Google Workspace accounts. Personal Gmail seeds keep their app passwords.</li></ul><p>The key is stored encrypted. ${S.google?`Client ID: <code>${esc(S.google.clientId)}</code>`:'Once saved, its client ID shows here.'}</p>`},
   sAi:{t:'AI writer',b:`<p>Writes each warm-up email with an AI model through OpenRouter, so no two look alike. Links and em dashes are removed from what it writes.</p><p>Get a key at openrouter.ai/keys. <b>Write a test email</b> shows one without sending it. With no key, built-in templates are used.</p>`},
   sCold:{t:'Cold email safety',b:`<p>An inbox can send campaigns only after this many warm-up days, and only while its 7-day placement is at or above the minimum.</p><p><b>Campaign emails per inbox per day</b> is the total across all campaigns.</p><p><b>Address for links</b>: campaign emails carry an unsubscribe link. Put it on a subdomain of a sending domain, never your main domain.</p><p>The PitchPersona reply address is optional. With it, replies show up on that prospect in PitchPersona.</p>`},
   sDnc:{t:'Do-not-email list',b:`<p>Nobody on this list gets a campaign email. Bounces, unsubscribes, "remove me" replies and anyone who replied are added automatically.</p><p>Add <code>@company.com</code> to block a whole company.</p>`},
@@ -1111,9 +1183,10 @@ $('#settingsForm').onsubmit=async e=>{
   e.preventDefault(); const f=e.target, body={timezone:f.timezone.value,requireDns:f.requireDns.checked,aiEnabled:f.aiEnabled.checked,aiModel:f.aiModel.value.trim(),topics:f.topics.value,replyWebhookUrl:f.replyWebhookUrl.value.trim(),linkUrl:f.linkUrl.value.trim()};
   NUMS.forEach(k=>body[k]=Number(f[k].value));
   if(f.openrouterKey.value.trim())body.openrouterKey=f.openrouterKey.value.trim();
+  if($('#gKey').value.trim())body.googleKey=$('#gKey').value.trim();
   if(!body.requireDns&&S.settings.requireDns&&!confirm('Turn off the DNS safety gate? Unauthenticated domains will be allowed to send.'))return;
   const done=busy(e.submitter||f.querySelector('button.primary.big'),'Saving…');
-  try{await api('/api/settings',{method:'PUT',body});$('#saveNote').textContent='Saved '+new Date().toLocaleTimeString();await load(false);fillSettings();toast('Settings saved. Any number outside its safe range was adjusted to fit.');}catch(err){fail(err.message,"Settings weren't saved");}
+  try{await api('/api/settings',{method:'PUT',body});$('#saveNote').textContent='Saved '+new Date().toLocaleTimeString();$('#gKey').value='';await load(false);fillSettings();toast('Settings saved. Any number outside its safe range was adjusted to fit.');}catch(err){fail(err.message,"Settings weren't saved");}
   done();
 };
 $('#aiTestBtn').onclick=async e=>{
@@ -1123,6 +1196,39 @@ $('#aiTestBtn').onclick=async e=>{
   try{const r=await api('/api/ai-test',{method:'POST'});out.textContent=`Subject: ${r.subject}\n\n${r.body}\n\n(${r.model}${r.cost!=null?`, cost $${Number(r.cost).toFixed(5)}`:''})`;await load(false);fillSettings();}
   catch(err){out.textContent='Failed: '+err.message;fail(err.message,"The AI didn't write an email");}
   e.target.disabled=false;e.target.textContent='Write a test email';
+};
+
+// Google sign-in card: the saved key, who uses it, and the button to switch the rest.
+function renderGoogle(){
+  const g=S.google, box=$('#googleState'); if(!box)return;
+  const using=S.inboxes.filter(i=>i.signin==='google'), okN=using.filter(i=>i.login==='ok').length, bad=using.filter(i=>i.login==='failed').length, sw=switchable().length;
+  box.innerHTML=!g?`<p class="small" style="margin:0 0 8px"><b>Not set up yet.</b> Google inboxes sign in with app passwords${S.network.onRailway?", and on Railway's Hobby plan they can't send":''}.</p>`
+    :`<div class="gstate"><div><span class="ok">✓</span> Key saved for <code>${esc(g.clientEmail)}</code></div>
+      <div class="row">Client ID <code>${esc(g.clientId)}</code><button type="button" class="btn sm" data-g="copyid">Copy</button></div>
+      <div class="muted small">${using.length?`${plural(using.length,'inbox','inboxes')} use${using.length===1?'s':''} it: ${okN} signed in${bad?`, ${bad} not yet. Each one's card on Inboxes says why`:''}.`:'No inbox uses it yet.'}</div>
+      ${sw?`<div class="row"><button type="button" class="btn primary sm" data-g="usegoogle">Use it for ${sw===1?'1 Google inbox':`all ${sw} Google inboxes`}</button></div>`:''}</div>`;
+  $('#gRemove').hidden=!g; $('#gSave').textContent=g?'Replace key':'Save key';
+  if(!gStepsSet){$('#gSteps').open=!g;gStepsSet=true;}
+}
+let gStepsSet=false;
+async function saveGoogleKey(text,btn){
+  const done=busy(btn,'Saving…');
+  try{await api('/api/settings',{method:'PUT',body:{googleKey:text}});$('#gKey').value='';done();await load(false);
+    const using=S.inboxes.filter(i=>i.signin==='google');
+    notify({kind:'ok',title:'Google key saved',msg:`Client ID ${S.google.clientId}. Next, allow it in Google Admin (step 6 of the setup), then press ${switchable().length?'Use it for all Google inboxes':'Test login on an inbox'}.`});
+    if(using.length)testMany(using.map(i=>i.id));}
+  catch(err){done();fail(err.message,"The key wasn't saved");}
+}
+$('#gSave').onclick=e=>{const t=$('#gKey').value.trim();if(!t)return fail('Choose the key file Google downloaded, or paste what is in it.','No key to save');saveGoogleKey(t,e.currentTarget);};
+$('#gFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  if(f.size>20000)return fail('That file is too big to be a service-account key. Pick the .json file from Keys, Create new key.','Wrong file');
+  saveGoogleKey(await f.text(),$('#gSave'));};
+$('#gRemove').onclick=async e=>{
+  const n=S.inboxes.filter(i=>i.signin==='google').length;
+  if(!confirm(n?`Remove the Google key? ${plural(n,'inbox','inboxes')} sign${n===1?'s':''} in with it and will stop sending and reading until a key is saved again or ${n===1?'it gets':'they get'} an app password.`:'Remove the Google key?'))return;
+  const done=busy(e.currentTarget,'Removing…');
+  try{await api('/api/settings',{method:'PUT',body:{googleKey:''}});toast('Google key removed');}catch(err){fail(err.message);}
+  done();await load(false);
 };
 
 // ── Charts (inline SVG, one y-axis each, hover tooltips) ──

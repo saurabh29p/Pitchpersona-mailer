@@ -23,7 +23,7 @@ const DEFAULT_OPT_OUT = 'If this isn\'t relevant, just reply "no" and I won\'t e
 
 export function createCampaigns(ctx) {
   const { db, DRY, event, getSettings, listInboxes, getInbox, blockedReason, dailyTarget, placement, localParts, daysAgo,
-    smtpSend, domainOf, EMAIL_RE, readJson, first, pickOne, rand } = ctx;
+    deliver, domainOf, EMAIL_RE, readJson, first, pickOne, rand } = ctx;
 
   db.exec(`
   CREATE TABLE IF NOT EXISTS campaigns (
@@ -253,11 +253,12 @@ export function createCampaigns(ctx) {
     const threadRefs = mail.threaded && lead.last_message_id ? { inReplyTo: lead.last_message_id, references: [lead.thread_id, lead.last_message_id].filter((v, i, a) => v && a.indexOf(v) === i) } : {};
     // Marked first, so a restart in the middle of a send can't lead to the same email twice.
     db.prepare("UPDATE leads SET status='sending', error=?, updated_at=? WHERE id=?").run(`Sending step ${step.n} from ${sender.email}`, now(), lead.id);
-    try { await smtpSend(sender, { to: { name: lead.name || "", address: lead.email }, subject: mail.subject, messageId, headers, ...bodies, ...threadRefs }); }
+    let sentId;
+    try { sentId = (await deliver(sender, { to: { name: lead.name || "", address: lead.email }, subject: mail.subject, messageId, headers, ...bodies, ...threadRefs })).messageId; }
     catch (e) { db.prepare("UPDATE leads SET status='queued', error=NULL WHERE id=? AND status='sending'").run(lead.id); throw e; }
     db.prepare("INSERT INTO messages (lead_id, campaign_id, step, sender, recipient, message_id, subject, body, sent_at, day, token) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
-      .run(lead.id, campaign.id, step.n, sender.email, lead.email, messageId, mail.subject, mail.text, now(), localParts(new Date(), s.timezone).day, msgToken);
-    advance(messageId, mail.threaded ? null : mail.subject);
+      .run(lead.id, campaign.id, step.n, sender.email, lead.email, sentId, mail.subject, mail.text, now(), localParts(new Date(), s.timezone).day, msgToken);
+    advance(sentId, mail.threaded ? null : mail.subject);
     event("send", sender.email, `${DRY ? "[dry] " : ""}Campaign "${campaign.name}" step ${step.n} to ${lead.email}: "${mail.subject}"`);
     return true;
   }
@@ -693,7 +694,7 @@ export function createCampaigns(ctx) {
       const step = stepsOf(c.id)[0];
       const mail = compose(c, step, lead, sender);
       if (mail.empty || mail.missing?.length) { reply(400, { error: mail.empty ? "Step 1 is empty for this lead" : `Missing ${mail.missing.join(", ")}` }); return true; }
-      try { await smtpSend(sender, { to: target.email, subject: `[TEST] ${mail.subject}`, text: mail.text }, { test: true }); }
+      try { await deliver(sender, { to: target.email, subject: `[TEST] ${mail.subject}`, text: mail.text }, { test: true }); }
       catch (e) { reply(400, { error: String(e.message).slice(0, 200) }); return true; }
       event("info", sender.email, `Test of "${c.name}" sent to ${target.email}`);
       reply(200, { from: sender.email, to: target.email, subject: mail.subject }); return true;

@@ -2,7 +2,7 @@
 
 An internal, self-hosted replacement for Instantly or Smartlead: inbox warm-up plus cold-email campaigns, run from a browser control panel. It is a separate tool from the PitchPersona app.
 
-**Warm-up:** a small self-hosted inbox warm-up. It sends ordinary work emails between your inboxes on a slow ramp, rescues them from spam, marks them read and important, replies to about a third, and charts inbox placement. Everything is managed in the panel: inboxes, app passwords, schedule, ramp, the AI model and pause or resume. Nothing needs a redeploy.
+**Warm-up:** a small self-hosted inbox warm-up. It sends ordinary work emails between your inboxes on a slow ramp, rescues them from spam, marks them read and important, replies to about a third, and charts inbox placement. Everything is managed in the panel: inboxes, how they sign in, schedule, ramp, the AI model and pause or resume. Nothing needs a redeploy.
 
 **Cost:** your Railway plan (about $5 a month), plus the AI writer on OpenRouter. With `anthropic/claude-haiku-4.5`, a full-volume day (6 inboxes at 40 a day, plus replies) is roughly $0.30, about $10 a month. A cheaper model in the panel brings that under $2 a month. With no key it uses built-in templates for free.
 
@@ -31,7 +31,7 @@ An internal, self-hosted replacement for Instantly or Smartlead: inbox warm-up p
 
 - **The bar under the tabs** says what the mailer is doing right now (the step a cycle is on), what the last cycle sent, why it sent nothing when it didn't (outside working hours, every inbox blocked, today's emails already sent, or nothing due yet), and when the next one runs. It says so when the panel can't reach the mailer, during a deploy for example, and reconnects by itself.
 - **Messages** in the corner confirm each action. Problems stay until you close them; good news fades. Start and Run a cycle now each end with a message saying what the cycle did.
-- **Every failed login has a reason and a fix**, worked out from what the mail server said: Railway blocking SMTP, a wrong or missing app password, IMAP turned off, a sign-in Google wants confirmed in a browser, too many attempts, a wrong server name, port or certificate. The server's own words are one tap away. A new app password is tested as soon as it's saved.
+- **Every failed login has a reason and a fix**, worked out from what the mail server or Google said: Railway blocking SMTP, a wrong or missing app password, IMAP turned off, a sign-in Google wants confirmed in a browser, too many attempts, a wrong server name, port or certificate, and for Google sign-in a missing delegation (with the client ID to paste), the Gmail API switched off, an address that isn't a Workspace user or a deleted key. The server's own words are one tap away. A new app password, or a switch to Google sign-in, is tested as soon as it's saved.
 
 ## 1. Fix DNS first (at your DNS host, for each domain)
 
@@ -48,7 +48,7 @@ Also give every inbox a profile photo and a plain signature, and add both domain
 
 ## 2. Deploy on Railway
 
-**Railway's Pro plan is required.** Railway blocks every email-sending (SMTP) connection on its Free, Trial and Hobby plans, so on Hobby every login test fails on sending with a timeout and nothing can be sent. Reading mail (IMAP, port 993) works on any plan. After upgrading, redeploy the service: Railway only opens the email ports on a new deploy. The mailer checks the connection to each mail server when it starts and every few minutes, says on Overview when it can't connect, and tests those logins again by itself once it can. See [Railway's outbound networking docs](https://docs.railway.com/reference/outbound-networking).
+**On Railway's Hobby plan, use Google sign-in.** Railway blocks every email-sending (SMTP) connection on its Free, Trial and Hobby plans ([outbound networking docs](https://docs.railway.com/reference/outbound-networking)), so inboxes that sign in with an app password can't send there. Google sign-in (below) sends through the Gmail API over HTTPS, which every plan allows, and reading mail (IMAP, port 993) works on any plan. The other way is Railway's Pro plan, then a redeploy: Railway only opens the email ports on a new deploy. The mailer checks the connection to each server it uses when it starts and every few minutes, says on Overview when it can't connect, and tests those logins again by itself once it can.
 
 1. In Railway, create a **New Project**, choose **Deploy from GitHub repo**, and pick `pitchpersona-mailer` on the `main` branch. Leave **Root Directory** empty. Railway reads `railway.json` from the repo root.
 2. Under **Settings**, then **Volumes**, add a volume mounted at `/data`. Keep **one replica**, because the database is a single SQLite file.
@@ -78,14 +78,26 @@ The mailer used to live in the `mailer` folder of `pitchpersona-backend`. To poi
 
 ## 3. Set it up in the panel
 
-The panel walks you through this. Overview shows a **Get set up** checklist until warm-up is running, and the **Guide** tab has the full checklist plus how a cycle works, the warm-up plan and what each colour means. Each step ticks itself off from what the mailer can see: a volume, inboxes, passing login tests, DNS, DKIM signing on received mail, and sending. **Start warm-up** refuses, and says why, until there are at least two inboxes with a sender among them and an app password saved. An inbox's day 1 is the day you press Start, unless you picked its day 1 yourself.
+The panel walks you through this. Overview shows a **Get set up** checklist until warm-up is running, and the **Guide** tab has the full checklist plus how a cycle works, the warm-up plan and what each colour means. Each step ticks itself off from what the mailer can see: a volume, inboxes, passing login tests, DNS, DKIM signing on received mail, and sending. **Start warm-up** refuses, and says why, until there are at least two inboxes with a sender among them that can sign in. An inbox's day 1 is the day you press Start, unless you picked its day 1 yourself.
 
-1. In **Inboxes**, click **Add several** and paste one line per inbox: `email, app password, name`. App passwords come from Google Account, then Security, then 2-Step Verification, then App passwords.
-2. Optionally, add one or two **seed** inboxes at other providers, such as a personal Gmail or Outlook. They receive and reply, so your mail isn't only going Google to Google.
-3. Each inbox tests its login as soon as its app password is saved (or press **Test login**). A failure shows the reason and the fix on the inbox card and on Overview.
+1. Set up **Google sign-in** (next section) for Google Workspace inboxes. Then in **Inboxes**, click **Add several** and paste one line per inbox: `email, name`. Inboxes that sign in with an app password take `email, app password, name` instead; app passwords come from Google Account, then Security, then 2-Step Verification, then App passwords.
+2. Optionally, add one or two **seed** inboxes at other providers, such as a personal Gmail or Outlook. They receive and reply, so your mail isn't only going Google to Google. Personal Gmail can't use Google sign-in, so seeds use app passwords; on Railway's Hobby plan they still receive and get read, but can't reply.
+3. Each inbox tests its login as soon as it's set up (or press **Test login**). A failure shows the reason and the fix on the inbox card and on Overview.
 4. In **Settings**, then **AI writer**, paste your OpenRouter key, pick a model and click **Write a test email**.
 5. In Google Admin, open Apps, Google Workspace, Gmail, **Authenticate email**, and click **Start authentication** for each domain. Until then Google signs with its default key and your DKIM record goes unused. The panel confirms it from the headers of received warm-up mail.
 6. In **Overview**, wait until both domains say **Ready to send**, then press **Start warm-up**.
+
+### Google sign-in (no app passwords)
+
+One Google Cloud **service account**, allowed by your Workspace admin to act for your users (domain-wide delegation), signs the mailer in to every Google Workspace inbox. No inbox needs 2-Step Verification or an app password. Sending goes through the Gmail API over HTTPS; reading still uses IMAP, signed in with the same short-lived token (XOAUTH2). The key file is stored encrypted on the volume and never shown again. The panel's **Settings, Google sign-in** card has these steps with links:
+
+1. In [Google Cloud](https://console.cloud.google.com/projectcreate), signed in as a Workspace admin, create a project and [enable the Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com) in it.
+2. Under IAM & Admin, Service accounts, create a service account (no roles needed). Open it, then Keys, Add key, Create new key, JSON. If an organization policy blocks key creation, set "Disable service account key creation" to Not enforced under IAM & Admin, Organization policies (this needs the Organization Policy Administrator role).
+3. In the panel, press **Choose key file** and pick the file. The card shows the key's client ID.
+4. In [Google Admin](https://admin.google.com/ac/owl/domainwidedelegation), open Security, Access and data control, API controls, Manage Domain Wide Delegation, and add the client ID with the scope `https://mail.google.com/`. Do this in each Google Workspace account your sending domains belong to. IMAP must be on (Apps, Google Workspace, Gmail, End User Access).
+5. Press **Use it for all Google inboxes**. Each one tests its sign-in. Google can take a while to apply a new delegation; a refused Google sign-in is tried again every 15 minutes, so the inbox starts working by itself once Google allows it.
+
+Gmail gives a message sent through its API its own Message-ID, so the mailer reads back the one Gmail used and threads replies and follow-ups on it. A reply also names its Gmail thread, so conversations stay together in the sender's mailbox too. Google's sending limit pauses the inbox like an SMTP refusal does.
 
 ## Ramp
 
@@ -124,4 +136,4 @@ npm run dry                                       # one cycle, nothing sent
 npm test                                          # the full test suite, nothing leaves your machine
 ```
 
-`npm test` runs seven files in `test/`: reply, bounce and opt-out detection against a fake mailbox; deployment guards; the start guards and setup-guide facts; an end-to-end pass in dry-run mode (sign-in, inboxes, PitchPersona webhook ingest, review, sequences and threading, pauses, inbox removal, unsubscribe and click links); a real sending pass against local mock SMTP, IMAP and OpenRouter servers (needs `openssl`); a stability pass (clean stop, restart mid-send, DNS failures, a mail server that stops answering, batched reading, lead search); and a feedback pass (plain-language reasons for real Gmail and Railway errors, a blocked sending port that blocks Start with the fix, logins re-tested once it connects or after a redeploy, and cycle summaries). Run it after any change before deploying.
+`npm test` runs eight files in `test/`: reply, bounce and opt-out detection against a fake mailbox; deployment guards; the start guards and setup-guide facts; an end-to-end pass in dry-run mode (sign-in, inboxes, PitchPersona webhook ingest, review, sequences and threading, pauses, inbox removal, unsubscribe and click links); a real sending pass against local mock SMTP, IMAP and OpenRouter servers (needs `openssl`); a stability pass (clean stop, restart mid-send, DNS failures, a mail server that stops answering, batched reading, lead search); and a feedback pass (plain-language reasons for real Gmail and Railway errors, a blocked sending port that blocks Start with the fix, logins re-tested once it connects or after a redeploy, and cycle summaries); and a Google sign-in pass against a mock Google token endpoint, Gmail API and XOAUTH2 IMAP (each setup mistake explained, a refused sign-in retried by itself, warm-up, replies and a campaign follow-up sent through the API with SMTP blocked, Gmail's Message-ID recorded, rate limits). Run it after any change before deploying.
