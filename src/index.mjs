@@ -834,6 +834,28 @@ async function replyPhase(s, force) {
   db.prepare("UPDATE reply_queue SET done = 1 WHERE done = 0 AND due_at < ?").run(new Date(Date.now() - 2 * 86400000).toISOString());
 }
 
+// The newest few emails in a mailbox's Inbox and Sent folders. Read-only: nothing is marked as read.
+async function peekMailbox(inbox, n = 5) {
+  return withImap(inbox, async (client) => {
+    const boxes = await client.list();
+    const sentPath = boxes.find((b) => b.specialUse === "\\Sent")?.path;
+    const latest = async (path) => {
+      if (!path) return null;
+      const lock = await client.getMailboxLock(path, { readOnly: true });
+      try {
+        const uids = (await client.search({ all: true }, { uid: true })) || [], out = [], total = uids.length;
+        if (!total) return { folder: path, total, latest: out };
+        for await (const msg of client.fetch(uids.slice(-n).join(","), { envelope: true, flags: true }, { uid: true })) {
+          out.push({ subject: msg.envelope.subject || "", from: msg.envelope.from?.[0]?.address || "", to: (msg.envelope.to || []).map((a) => a.address).join(", "),
+            date: msg.envelope.date ? new Date(msg.envelope.date).toISOString() : null, read: msg.flags?.has("\\Seen") || false });
+        }
+        return { folder: path, total, latest: out.reverse() };
+      } finally { lock.release(); }
+    };
+    return { inbox: await latest("INBOX"), sent: await latest(sentPath) };
+  });
+}
+
 // ── Scheduler ───────────────────────────────────────────────────────────────────
 // phase says what a running cycle is doing right now; lastCycle sums up the one before.
 const state = { running: false, phase: null, runningSince: null, forced: false, lastTickAt: null, nextTickAt: null, lastCycle: null, timer: null };
@@ -1145,7 +1167,7 @@ async function api(req, res, url) {
     }
     return reply(200, { results });
   }
-  const im = /^\/api\/inboxes\/(\d+)(\/test|\/send-test)?$/.exec(p);
+  const im = /^\/api\/inboxes\/(\d+)(\/test|\/send-test|\/peek)?$/.exec(p);
   if (im) {
     const i = getInbox(Number(im[1]));
     if (!i) return reply(404, { error: "Inbox not found" });
@@ -1158,6 +1180,13 @@ async function api(req, res, url) {
     if (im[2] === "/test" && m === "POST") {
       if (!canSignIn(i) && !DRY) return reply(400, { error: usesGoogle(i) ? NO_GOOGLE_KEY : `Save an app password for ${i.email} first: press Edit, paste it, then Save.` });
       return reply(200, await testInbox(i));
+    }
+    // What the mailbox itself holds right now, read the same way the mailer reads it, so you can
+    // check the mailer is looking at the account you think it is.
+    if (im[2] === "/peek" && m === "GET") {
+      if (!canSignIn(i) || DRY) return reply(400, { error: "This inbox can't sign in yet. Press Test login first." });
+      try { return reply(200, { email: i.email, ...(await peekMailbox(i)) }); }
+      catch (e) { return reply(400, { error: friendlyError("imap", e, i, xopts()) }); }
     }
     if (im[2] === "/send-test" && m === "POST") {
       const s = getSettings(), pool = listInboxes();

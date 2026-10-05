@@ -144,6 +144,9 @@ if (haveCert) {
     await runNow();
     mail = (await api("/api/mail")).body;
     ok(mail.some((m) => m.folder === "inbox"), "warm-up mail sent through the API is found on arrival over IMAP, so placement counts it", JSON.stringify(mail.map((m) => m.folder)));
+    const pk = await api(`/api/inboxes/${B}/peek`);
+    ok(pk.status === 200 && pk.body.email === "two@getpitchpersona.test" && pk.body.inbox?.latest.some((m) => m.from === gin.email),
+      "Check mailbox lists the newest emails in that mailbox's Inbox, read with its own sign-in", JSON.stringify(pk.body).slice(0, 400));
     const a0 = await inbox(A);
     ok(a0.health === a0.placement7d && a0.errors7d === 0 && a0.errorsFixed7d > 0,
       "errors from before the last passing login test don't lower health", JSON.stringify({ health: a0.health, p: a0.placement7d, e: a0.errors7d, fixed: a0.errorsFixed7d }));
