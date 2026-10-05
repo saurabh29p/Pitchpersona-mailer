@@ -40,6 +40,10 @@ if (!PERSISTENT) console.warn(`No Railway volume is mounted at ${DATA_DIR}: inbo
 const db = new DatabaseSync(path.join(DATA_DIR, "warmup.db"));
 let camp = null;   // the campaign sender, wired up once every helper below exists
 const PANEL_HTML = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "panel.html"), "utf8");
+// The PitchPersona web app's fonts and mark, served from a fixed list (never a path from the URL).
+const ASSET_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "assets");
+const ASSETS = Object.fromEntries(fs.readdirSync(ASSET_DIR).filter((f) => /\.(woff2|png)$/.test(f))
+  .map((f) => [f, { body: fs.readFileSync(path.join(ASSET_DIR, f)), type: f.endsWith(".png") ? "image/png" : "font/woff2" }]));
 
 db.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
 db.exec(`
@@ -1219,6 +1223,8 @@ function serve() {
     try {
       const url = new URL(req.url, "http://x");
       if (url.pathname === "/health") { db.prepare("SELECT 1").get(); return res.writeHead(200).end("ok"); }
+      const asset = url.pathname.startsWith("/assets/") && Object.hasOwn(ASSETS, url.pathname.slice(8)) ? ASSETS[url.pathname.slice(8)] : null;
+      if (asset) return res.writeHead(200, { "content-type": asset.type, "cache-control": "public, max-age=604800" }).end(asset.body);
       if (await camp.publicRoute(req, res, url)) return;
       if (url.pathname.startsWith("/api/")) return await api(req, res, url);
       res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }).end(PANEL_HTML);
