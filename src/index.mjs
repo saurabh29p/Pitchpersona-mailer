@@ -615,6 +615,8 @@ function chooseRecipient(s, from, pool) {
 }
 
 const inWindow = (s, now) => now.hour >= s.startHour && now.hour < s.endHour;
+// How many emails Send one now may add on top of an inbox's plan for the day.
+const MANUAL_EXTRA = 5;
 const sentToday = (email, day) => db.prepare("SELECT COUNT(*) c FROM sent WHERE sender = ? AND day = ? AND depth = 0").get(email, day).c;
 
 // Why an inbox can't send right now, or null when it can.
@@ -931,7 +933,7 @@ export async function overview() {
     const health = p7.pct == null ? null : Math.max(0, Math.min(100, p7.pct - errorsNow * 3));
     // An inbox's own cap below the ramp's stops it climbing, which is easy to set and forget.
     const capNote = i.role === "sender" && i.cap && i.cap < s.rampCap
-      ? `Its own daily cap of ${i.cap} keeps it at ${i.cap} warm-up email${i.cap > 1 ? "s" : ""} a day for good. Without it, it would climb to ${s.rampCap} a day by day ${Math.ceil(Math.max(0, s.rampCap - s.rampStart) / s.rampPerDay) + 1}. Press Edit and clear "Own daily cap" to let it ramp.`
+      ? `Its own daily cap of ${i.cap} keeps it at ${i.cap} warm-up email${i.cap > 1 ? "s" : ""} a day for good. Without it, it would climb to ${s.rampCap} a day by day ${Math.ceil(Math.max(0, s.rampCap - s.rampStart) / s.rampPerDay) + 1}. Clear its daily cap and press Save to let it ramp.`
       : null;
     inboxes.push({
       id: i.id, email: i.email, name: i.name, role: i.role, provider: i.provider, smtp_host: i.smtp_host, smtp_port: i.smtp_port,
@@ -1161,13 +1163,18 @@ async function api(req, res, url) {
       const why = await blockedReason(s, i);
       if (why) return reply(400, { error: why });
       const { target } = dailyTarget(i, s);
-      if (sentToday(i.email, localParts(new Date(), s.timezone).day) >= target) return reply(400, { error: `Today's limit for this inbox (${target}) is already reached` });
+      // A press of Send one now may go a few past today's plan, so testing never waits for tomorrow,
+      // but not so many that a new inbox gets pushed hard.
+      const allowed = Math.min(SETTINGS.rampCap.max, target + MANUAL_EXTRA);
+      const already = sentToday(i.email, localParts(new Date(), s.timezone).day);
+      if (already >= allowed) return reply(400, { error: `Nothing was sent. ${i.email} has sent ${already} today, and the most is its plan of ${target} plus ${allowed - target} extra by hand, which is as many as is safe for one day. It sends again tomorrow, or raise its daily cap on the inbox card.` });
       const to = chooseRecipient(s, i, pool);
       if (!to) return reply(400, { error: "Add at least one more inbox to send to" });
       try {
         const email = await writeEmail(s, { from: i, to, topic: pickOne(s.topics) });
         await send(s, { from: i, to, ...email, depth: 0, test: true });
-        return reply(200, { to: to.email, subject: email.subject, by: email.by, sentToday: sentToday(i.email, localParts(new Date(), s.timezone).day), target });
+        const n = sentToday(i.email, localParts(new Date(), s.timezone).day);
+        return reply(200, { to: to.email, subject: email.subject, by: email.by, sentToday: n, target, extraLeft: allowed - Math.max(n, target) });
       } catch (e) { return reply(400, { error: String(e.message).slice(0, 300) }); }
     }
   }

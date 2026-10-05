@@ -177,6 +177,7 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
 .tl .d{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:16px}
 .legend-list{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 12px;align-items:center;font-size:14px}
 @media (max-width:760px){.flow{grid-template-columns:minmax(0,1fr);gap:22px}.flow>div:not(:last-child)::after{content:"\2193";right:auto;left:50%;top:auto;bottom:-22px;transform:translateX(-50%)}}
+.caprow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:10px 0 4px}.caprow input{width:76px}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}.kv dt{color:var(--text-2)}.kv dd{margin:0;word-break:break-all}
 .grid>.card{margin:0}.grid{margin-bottom:16px}
 @media (max-width:640px){.tile .val{font-size:24px}.hide-sm{display:none}header{position:static}.hrow{gap:8px}.hrow h1{flex-basis:100%}.big{padding:8px 14px}.tile{padding:12px}.g4{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}
@@ -242,7 +243,7 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
     <details class="howto" data-howto="inboxes"><summary>How to use this page</summary><div class="in"><ol><li>For Google Workspace inboxes, set up <b>Google sign-in</b> once under Settings. Then no inbox needs an app password. Otherwise, create an app password for each inbox.</li>
 <li>Press <b>Add several</b> and paste one line per inbox: <code>email, name</code> with Google sign-in, or <code>email, app password, name</code>.</li>
 <li>Each inbox tests its login by itself when you save its app password. Both sending and reading should pass. If one fails, the card says why and what to do.</li>
-<li>Optional: add one or two seeds at other providers.</li></ol><div class="btnref"><span class="k">Add several</span><span>Adds many inboxes at once, one line each. Each starts on day 1 of its own ramp.</span><span class="k">Add inbox</span><span>Adds one inbox. Under Server settings you can use a provider other than Google.</span><span class="k">Pause / Resume</span><span>Stops sending from this inbox only. It still reads its mail, so replies are caught.</span><span class="k">Test login</span><span>Signs in to send and to read, without sending anything. The card then shows each result, and for a failure the reason and the fix.</span><span class="k">Send one now</span><span>Sends one real warm-up email to another of your inboxes. It counts toward today's limit.</span><span class="k">Edit</span><span>Changes the name, how it signs in, the app password, daily cap or day 1. The address can't change.</span><span class="k">Remove</span><span>Deletes the inbox. Its history stays, and leads it was emailing wait in Review.</span></div></div></details>
+<li>Optional: add one or two seeds at other providers.</li></ol><div class="btnref"><span class="k">Add several</span><span>Adds many inboxes at once, one line each. Each starts on day 1 of its own ramp.</span><span class="k">Add inbox</span><span>Adds one inbox. Under Server settings you can use a provider other than Google.</span><span class="k">Pause / Resume</span><span>Stops sending from this inbox only. It still reads its mail, so replies are caught.</span><span class="k">Test login</span><span>Signs in to send and to read, without sending anything. The card then shows each result, and for a failure the reason and the fix.</span><span class="k">Send one now</span><span>Sends one real warm-up email to another of your inboxes. It counts toward today's plan, and you can send up to 5 extra by hand each day.</span><span class="k">Daily cap · Save</span><span>Holds this inbox at that many warm-up emails a day. Leave it empty and press Save to follow the ramp.</span><span class="k">Edit</span><span>Changes the name, how it signs in, the app password, daily cap or day 1. The address can't change.</span><span class="k">Remove</span><span>Deletes the inbox. Its history stays, and leads it was emailing wait in Review.</span></div></div></details>
     <div class="row spread" style="margin-bottom:12px"><p class="muted small" style="margin:0;flex:1;min-width:220px">Senders warm up on the ramp. Seeds are inboxes at other providers (a personal Gmail or Outlook). They only receive and reply, which shows how other providers treat your mail.</p><div class="row"><button type="button" class="qh" data-help="roles" aria-label="Senders and seeds" aria-expanded="false">?</button><button class="btn" id="bulkBtn">Add several</button><button class="btn primary" id="addInboxBtn">Add inbox</button></div></div>
     <div id="inboxCards" class="grid g2"></div>
   </section>
@@ -514,7 +515,7 @@ details.howto ol,details.howto ul{margin:0 0 10px;padding-left:20px}details.howt
       <label class="f full" id="signinRow">Sign in with<select name="signin"><option value="google">Google sign-in (no app password)</option><option value="password">App password</option></select><span class="muted small" id="signinHint"></span></label>
       <label class="f full" id="pwRow">App password<input name="password" type="password" autocomplete="new-password" placeholder="16-character app password"><span class="muted small" id="pwHint">Google: Account, then Security, then 2-Step Verification, then App passwords.</span></label>
       <label class="f">Warm-up day 1<input name="start_date" type="date"></label>
-      <label class="f">Own daily cap (optional)<input name="cap" type="number" min="1" max="50" placeholder="uses ramp cap"></label>
+      <label class="f">Daily cap (optional)<input name="cap" type="number" min="1" max="50" placeholder="uses ramp cap"></label>
       <details class="full"><summary class="small muted">Server settings</summary>
         <div class="form" style="margin-top:10px">
           <label class="f">SMTP host<input name="smtp_host"></label><label class="f">SMTP port<input name="smtp_port" type="number"></label>
@@ -827,8 +828,11 @@ function statusPill(i){
   return `<span class="pill ${c}" title="${esc(i.blocked||(l==='Ready'?'Waiting for Start warm-up':''))}">${l}</span>`;
 }
 
+// A daily cap being typed on a card survives the panel's refresh every 20 seconds.
+const capDraft={};
 function renderInboxCards(){
   const box=$('#inboxCards');
+  if(document.activeElement?.classList.contains('capIn'))return;
   if(!S.inboxes.length){box.innerHTML=`<div class="card" style="grid-column:1/-1"><h2>Add your first inboxes</h2>${HOW_PASSWORDS}
     <div class="row" style="margin-top:12px"><button class="btn primary" data-g="bulk">Add several at once</button><button class="btn" data-g="add">Add one inbox</button></div></div>`;return;}
   box.innerHTML=S.inboxes.map(i=>`<div class="card ibox" style="margin:0" data-card="${i.id}">
@@ -838,6 +842,8 @@ function renderInboxCards(){
     ${i.capNote?`<div class="small" style="color:var(--warn-text)">${esc(i.capNote)}</div>`:''}
     ${i.role==='sender'?`<div class="chart" data-ramp="${i.id}"></div><div class="legend" style="margin:0"><span><i style="background:var(--s1)"></i>Sent</span><span><i style="background:var(--ref);height:2px"></i>Planned</span></div>`:''}
     <dl class="kv"><dt>Warm-up day</dt><dd>${i.role==='seed'?'–':i.day||'starts '+shortDay(i.start_date)}</dd><dt>Sent 7d</dt><dd>${i.sent7d}</dd><dt>Received 7d</dt><dd>${i.received7d}</dd><dt>Errors 7d</dt><dd>${i.errors7d}${i.errorsFixed7d?` <span class="muted small" title="These came before its last passing login test, so they were setup problems that are fixed now. They don't lower its health.">(+${i.errorsFixed7d} fixed during setup)</span>`:''}</dd><dt>Sign-in</dt><dd>${i.signin==='google'?(S.google?'Google sign-in':'<span style="color:var(--bad-text)">Google sign-in, key missing</span>'):i.hasPassword?'App password (encrypted)':'<span style="color:var(--bad-text)">No app password</span>'}</dd></dl>
+    ${i.role==='sender'?`<div class="caprow"><label class="small" for="cap${i.id}">Daily cap</label><input id="cap${i.id}" class="capIn" data-id="${i.id}" type="number" min="1" max="${S.limits.rampCap[1]}" step="1" value="${esc(String(capDraft[i.id]??i.cap??''))}" placeholder="none"><button class="btn sm" data-act="cap" data-id="${i.id}">Save</button><button type="button" class="qh" data-help="dailyCap" aria-label="What is the daily cap?" aria-expanded="false">?</button>
+      <span class="muted small">Today's plan: ${i.targetToday}. ${i.cap?`Capped at ${i.cap} a day.`:`No cap: follows the ramp up to ${S.settings.rampCap} a day.`}</span></div>`:''}
     <div class="acts">
       <button class="btn sm" data-act="pause" data-id="${i.id}">${i.paused?'Resume':'Pause'}</button>
       <button class="btn sm" data-act="test" data-id="${i.id}" ${testing.has(i.id)?'disabled':''}>${testing.has(i.id)?'<span class="spin"></span> Testing…':'Test login'}</button>
@@ -848,16 +854,27 @@ function renderInboxCards(){
   S.inboxes.filter(i=>i.role==='sender').forEach(i=>rampVsActual($(`[data-ramp="${i.id}"]`),i));
 }
 
+$('#inboxCards').addEventListener('input',e=>{if(e.target.classList.contains('capIn'))capDraft[e.target.dataset.id]=e.target.value;});
+$('#inboxCards').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.classList.contains('capIn')){e.preventDefault();e.target.parentElement.querySelector('[data-act=cap]').click();}});
 $('#inboxCards').addEventListener('click',async e=>{
   const b=e.target.closest('[data-act]'); if(!b)return;
   const i=S.inboxes.find(x=>x.id==b.dataset.id), act=b.dataset.act;
   if(act==='edit')return openInbox(i);
   if(act==='test')return testLogin(i.id);
+  if(act==='cap'){
+    const raw=String(capDraft[i.id]??$(`#cap${i.id}`).value).trim(), cap=raw===''?null:Number(raw), max=S.limits.rampCap[1];
+    if(cap!==null&&!(Number.isInteger(cap)&&cap>=1&&cap<=max))return fail(`Enter a whole number from 1 to ${max}, or leave it empty for no cap.`,"Couldn't save the daily cap");
+    const done=busy(b,'Saving…');
+    try{await api('/api/inboxes/'+i.id,{method:'PUT',body:{cap}});delete capDraft[i.id];
+      toast(cap?`${i.email} now sends at most ${cap} warm-up emails a day`:`${i.email} has no cap now and follows the ramp up to ${S.settings.rampCap} a day`);}
+    catch(err){fail(err.message,"Couldn't save the daily cap");}
+    done(); document.activeElement?.blur(); return load(false);
+  }
   if(act==='del'&&!confirm(`Remove ${i.email}? Its history stays in the stats. Leads it was emailing wait in review, so you can check this mailbox for replies first.`))return;
   const done=busy(b,{pause:i.paused?'Resuming…':'Pausing…',send:'Writing and sending…',del:'Removing…'}[act]||'Working…');
   try{
     if(act==='pause'){await api('/api/inboxes/'+i.id,{method:'PUT',body:{paused:!i.paused}});toast(i.paused?`${i.email} resumed`:`${i.email} paused. It still reads its mail.`);}
-    if(act==='send'){const r=await api(`/api/inboxes/${i.id}/send-test`,{method:'POST'});notify({kind:'ok',title:`Sent from ${i.email} to ${r.to}`,msg:`"${r.subject}", written by ${r.by==='ai'?'the AI':'a template'}. That's ${r.sentToday} of today's ${r.target} warm-up emails for this inbox${r.sentToday>=r.target?', so it sends no more today':''}. Activity shows where it lands after the next cycle.`});}
+    if(act==='send'){const r=await api(`/api/inboxes/${i.id}/send-test`,{method:'POST'});notify({kind:'ok',title:`Sent from ${i.email} to ${r.to}`,msg:`"${r.subject}", written by ${r.by==='ai'?'the AI':'a template'}. ${r.sentToday>r.target?`That's ${r.sentToday-r.target} extra on top of today's plan of ${r.target}. You can send ${r.extraLeft} more by hand today.`:`That's ${r.sentToday} of today's ${r.target} planned warm-up emails for this inbox.`} Activity shows where it lands after the next cycle.`});}
     if(act==='del'){await api('/api/inboxes/'+i.id,{method:'DELETE'});toast(`${i.email} removed`);}
   }catch(err){fail(err.message,{pause:"Couldn't change this inbox",send:`Couldn't send from ${i.email}`,del:`Couldn't remove ${i.email}`}[act]);}
   done(); await load(false);
@@ -1112,7 +1129,8 @@ const HELP={
   placement:{t:'Inbox placement',b:()=>`<p>The share of warm-up emails that landed in the inbox rather than spam, as seen by the inbox that received them.</p><ul><li>90% or more is healthy.</li><li>Below ${S.settings.slowdownBelow}%, that inbox sends half as much.</li><li>Below ${S.settings.autoPauseBelow}%, it pauses itself.</li></ul>`},
   dns:{t:'Domain authentication',b:`<p>SPF, DKIM and DMARC prove your mail really comes from your domain. Without all three, Gmail and Outlook send it to spam, so sending is blocked until they're found.</p><p>A passing result is kept for 6 hours. A failing domain is checked again every 15 minutes, or press <b>Re-check DNS</b> after changing a record.</p><p>DKIM also needs <b>Start authentication</b> clicked in Google Admin.</p>`},
   roles:{t:'Senders and seeds',b:`<p><b>Sender</b>: an inbox on your sending domains. It warms up on the ramp and can later send campaigns.</p><p><b>Seed</b>: an inbox at another provider, like a personal Gmail or Outlook. It only receives and replies, which shows how outside providers treat your mail.</p><p><b>Add several</b> takes one line per inbox: <code>email, name</code> with Google sign-in, or <code>email, app password, name</code>.</p>`},
-  inboxActions:{t:'Inbox buttons',b:`<ul><li><b>Pause / Resume</b>: stops sending from this inbox only. It still reads mail, so replies are caught.</li><li><b>Test login</b>: signs in to send and to read, without sending anything. A failure shows the reason and the fix on the card.</li><li><b>Send one now</b>: sends one real warm-up email to another of your inboxes. It counts toward today's limit.</li><li><b>Edit</b>: change the name, how it signs in (Google sign-in or app password), the daily cap or day 1.</li><li><b>Remove</b>: deletes the inbox. History stays, and leads it was emailing wait in Review.</li></ul>`},
+  dailyCap:{t:'Daily cap',b:()=>`<p>The most warm-up emails this inbox sends in a day. Type a number and press <b>Save</b>, or leave it empty and Save to remove the cap.</p><ul><li><b>No cap</b> (recommended): it starts at ${S.settings.rampStart} a day, adds ${S.settings.rampPerDay} each day, and stops at ${S.settings.rampCap}.</li><li><b>With a cap</b>: it climbs the same way but never above your number. A low cap keeps it there for good, and campaigns need enough warm-up mail to unlock.</li><li>The cap counts from today. Emails already sent today stay counted.</li></ul>`},
+  inboxActions:{t:'Inbox buttons',b:`<ul><li><b>Pause / Resume</b>: stops sending from this inbox only. It still reads mail, so replies are caught.</li><li><b>Test login</b>: signs in to send and to read, without sending anything. A failure shows the reason and the fix on the card.</li><li><b>Send one now</b>: sends one real warm-up email to another of your inboxes. It counts toward today's plan, and once the plan is used up you can still send up to 5 extra by hand each day.</li><li><b>Daily cap</b>: type a number and press Save to hold this inbox at that many warm-up emails a day. Empty means no cap, so it follows the ramp.</li><li><b>Edit</b>: change the name, how it signs in (Google sign-in or app password), the daily cap or day 1.</li><li><b>Remove</b>: deletes the inbox. History stays, and leads it was emailing wait in Review.</li></ul>`},
   campaigns:{t:'How campaigns work',b:()=>`<ol><li><b>New campaign</b>, then add leads.</li><li>Check the sequence and preview it.</li><li>Pick inboxes and hours.</li><li><b>Send a test</b>, then <b>Start sending</b>.</li></ol><p>An inbox sends campaigns only after ${S.settings.coldMinWarmDays} warm-up days with ${S.settings.coldMinPlacement}% placement or more, and at most ${S.settings.coldDailyCap} campaign emails a day. A reply stops that person's sequence.</p>`},
   campButtons:{t:'Campaign buttons',b:`<ul><li><b>Start sending / Pause</b>: switches this campaign on or off. Leads keep their place.</li><li><b>Send a test</b>: sends step 1, filled in for the newest lead, to one of your own inboxes with [TEST] in the subject.</li><li><b>Archive</b>: ends the campaign. Unsent leads are skipped and history stays.</li></ul>`},
   leadStatus:{t:'Lead statuses',b:`<ul><li><b>Review</b>: waiting for you. Approve to queue them.</li><li><b>Scheduled</b>: the next email goes out at its time.</li><li><b>Replied</b>, <b>Bounced</b>, <b>Unsubscribed</b>: stopped for good, and kept out of every campaign.</li><li><b>Finished</b>: got every step.</li><li><b>Needs a fix</b>: a variable was missing, or 5 tries failed. Open it to see why, fix it, then Retry.</li><li><b>Skipped</b>: you stopped it.</li></ul>`},

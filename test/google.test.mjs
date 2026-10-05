@@ -182,6 +182,16 @@ if (haveCert) {
     await runNow();
     ok(db.prepare("SELECT status FROM leads WHERE email = 'lead@prospect.test'").get().status === "replied", "the prospect's reply is matched and stops the sequence");
 
+    // Send one now may go a few past today's plan, then says why it stops.
+    const sentA = () => db.prepare("SELECT COUNT(*) c FROM sent WHERE sender = ? AND day = ? AND depth = 0").get(gin.email, day(0)).c;
+    const plan = Math.max(1, sentA());
+    await api(`/api/inboxes/${A}`, "PUT", { cap: plan });
+    let extra = 0, lastSend;
+    for (let k = 0; k < 10; k++) { lastSend = await api(`/api/inboxes/${A}/send-test`, "POST", {}); if (lastSend.status !== 200) break; extra++; }
+    ok(extra === 5 && sentA() === plan + 5 && lastSend.status === 400 && /Nothing was sent/.test(lastSend.body.error) && new RegExp(`its plan of ${plan} plus 5 extra`).test(lastSend.body.error),
+      "Send one now sends past today's plan up to 5 extra, then says nothing was sent and why", JSON.stringify({ sent: sentA(), extra, err: lastSend.body }));
+    await api(`/api/inboxes/${A}`, "PUT", { cap: null });
+
     // Google withdraws the sign-in for one domain: that inbox waits with the fix, it isn't paused.
     G.delegated.delete("getpitchpersona.test");
     for (const [tok, u] of G.tokens) if (u.endsWith("@getpitchpersona.test")) G.tokens.delete(tok);
