@@ -33,6 +33,26 @@ An internal, self-hosted replacement for Instantly or Smartlead: inbox warm-up p
 - **Messages** in the corner confirm each action. Problems stay until you close them; good news fades. Start and Run a cycle now each end with a message saying what the cycle did.
 - **Every failed login has a reason and a fix**, worked out from what the mail server or Google said: Railway blocking SMTP, a wrong or missing app password, IMAP turned off, a sign-in Google wants confirmed in a browser, too many attempts, a wrong server name, port or certificate, and for Google sign-in a missing delegation (with the client ID to paste), the Gmail API switched off, an address that isn't a Workspace user or a deleted key. The server's own words are one tap away. A new app password, or a switch to Google sign-in, is tested as soon as it's saved.
 
+## Inbox tools in the panel
+
+- **The look:** the panel uses the PitchPersona web app's theme (ink and violet, Inter,
+  a left sidebar). Light, dark or follow the device is chosen in the sidebar.
+- **Problems vs. to-dos:** problems that stop sending show on every page. To-dos show only
+  on Overview, with a count in the sidebar.
+- **Daily cap:** each sender card has a Daily cap field. Empty follows the ramp. A cap
+  below the ramp's cap says on the card that it holds the inbox at that volume.
+- **Send one now:** can go up to 5 emails past today's plan each day, for testing. When it
+  can't send, it says nothing was sent and why. It also says how much of today's warm-up
+  it used.
+- **Check mailbox:** reads the inbox's Inbox and Sent folders read-only, with its own
+  sign-in, and lists the newest emails on the card with the exact account address. Use it
+  when warm-up mail can't be found in Gmail.
+- **Next reply due:** Overview shows when the next queued warm-up reply goes out (replies
+  wait 20 to 150 minutes).
+- **Health:** errors from before an inbox's last passing login test (a wrong password, a
+  blocked port) are setup problems that are already fixed. They show separately and don't
+  lower its health score.
+
 ## 1. Fix DNS first (at your DNS host, for each domain)
 
 getpitchpersona.com and trypitchpersona.com passed all three checks on 4 Oct 2026. For any new sending domain, add these records first. The panel shows the domain as blocked until they exist.
